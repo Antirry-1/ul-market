@@ -1,0 +1,52 @@
+name: ul-market
+
+x-env: &env
+  env_file:
+    - path: .env.example
+    - path: .env
+      required: false
+
+services:
+  postgres:
+    image: postgres:17
+    <<: *env
+    ports:
+      - "${POSTGRES_HOST_PORT:-55432}:5432"
+    shm_size: 256m
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # -h обязателен: без него проверка позеленеет на временном сервере init-фазы.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  source-seed:
+    image: postgres:17
+    <<: *env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./sql:/seed/sql:ro
+      - ./docker/seed_source.sh:/seed/seed_source.sh:ro
+    entrypoint: ["bash", "/seed/seed_source.sh"]
+    restart: "no"
+
+  pipeline:
+    build:
+      context: .
+      dockerfile: docker/pipeline.Dockerfile
+    image: ul-market-pipeline:local
+    <<: *env
+    depends_on:
+      source-seed:
+        condition: service_completed_successfully
+    volumes:
+      - artifacts:/artifacts
+    restart: "no"
+
+volumes:
+  pgdata:
+  artifacts:
