@@ -1,0 +1,47 @@
+slice_name: Коридор ставки по месяцам
+description: null
+certified_by: null
+certification_details: null
+viz_type: echarts_timeseries_line
+params:
+  datasource: 3__table
+  viz_type: echarts_timeseries_line
+  x_axis: month
+  time_grain_sqla: P1M
+  x_axis_sort_asc: true
+  groupby: []
+  row_limit: 1000
+  adhoc_filters: []
+  time_range: No filter
+  show_legend: true
+  legendOrientation: top
+  rich_tooltip: true
+  tooltipTimeFormat: '%Y-%m'
+  x_axis_time_format: '%Y-%m'
+  y_axis_format: SMART_NUMBER
+  markerEnabled: true
+  markerSize: 4
+  truncateYAxis: false
+  y_axis_title_margin: 15
+  x_axis_title_margin: 15
+  metrics:
+  - expressionType: SQL
+    sqlExpression: MAX(p25_trip)
+    label: P25
+    hasCustomLabel: true
+    optionName: metric_88b05a42
+  - expressionType: SQL
+    sqlExpression: MAX(median_trip)
+    label: Медиана
+    hasCustomLabel: true
+    optionName: metric_8bd7320d
+  - expressionType: SQL
+    sqlExpression: MAX(p75_trip)
+    label: P75
+    hasCustomLabel: true
+    optionName: metric_129af126
+query_context: null
+cache_timeout: null
+uuid: 674eeecb-928b-517f-ab04-ce5f16045083
+version: 1.0.0
+dataset_uuid: 2923a2cc-6599-53d6-b693-abdae312b05b

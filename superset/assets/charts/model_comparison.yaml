@@ -1,0 +1,56 @@
+slice_name: Сравнение моделей на test
+description: null
+certified_by: null
+certification_details: null
+viz_type: table
+params:
+  datasource: 10__table
+  viz_type: table
+  column_config:
+    r2:
+      d3NumberFormat: .4f
+    mape_pct: &id001
+      d3NumberFormat: .2f
+    mdape_pct: *id001
+    wape_pct: *id001
+    rmse_rub: &id002
+      d3NumberFormat: ',.0f'
+    mae_rub: *id002
+  query_mode: raw
+  all_columns:
+  - model_name
+  - n_rows
+  - r2
+  - mape_pct
+  - mdape_pct
+  - wape_pct
+  - rmse_rub
+  - mae_rub
+  order_by_cols:
+  - '["mape_pct", true]'
+  row_limit: 20
+  adhoc_filters:
+  - expressionType: SQL
+    sqlExpression: split = 'test'
+    clause: WHERE
+    filterOptionName: filter_0a0f74a5
+  - expressionType: SQL
+    sqlExpression: slice = 'no_outliers'
+    clause: WHERE
+    filterOptionName: filter_e70a068c
+  - expressionType: SQL
+    sqlExpression: model_name <> 'leak_demo_price_per_km'
+    clause: WHERE
+    filterOptionName: filter_e5b34d2f
+  include_search: true
+  show_cell_bars: false
+  table_timestamp_format: '%Y-%m-%d'
+  time_range: No filter
+  server_pagination: false
+  page_length: 25
+  color_pn: false
+query_context: null
+cache_timeout: null
+uuid: eb71d472-459a-5b59-ac8a-79f77cb00670
+version: 1.0.0
+dataset_uuid: 3358b501-53b1-52a5-8802-8eba0d8005fc

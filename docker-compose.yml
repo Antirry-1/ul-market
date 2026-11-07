@@ -6,6 +6,24 @@ x-env: &env
     - path: .env
       required: false
 
+x-airflow: &airflow
+  build:
+    context: .
+    dockerfile: docker/airflow.Dockerfile
+  image: ul-market-airflow:local
+  <<: *env
+  # Тот же uid, что у pipeline: модели лежат в общем томе artifacts.
+  user: "1000:0"
+  environment: &airflow-env
+    # Команда, а не готовая строка: так её видят и entrypoint, и docker compose exec.
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN_CMD: python /opt/pipeline/docker/airflow_db_url.py
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__WEBSERVER__WORKERS: "2"
+  volumes:
+    - artifacts:/artifacts
+    - airflow-logs:/opt/airflow/logs
+
 services:
   postgres:
     image: postgres:17
@@ -47,6 +65,132 @@ services:
       - artifacts:/artifacts
     restart: "no"
 
+  # Метаданные Airflow и Superset отделены от данных: их не задевают ни down, ни пересборка хранилища.
+  meta-postgres:
+    image: postgres:16-alpine
+    profiles: [airflow, superset]
+    <<: *env
+    volumes:
+      - metadata:/var/lib/postgresql/data
+      - ./docker/meta_init.sh:/docker-entrypoint-initdb.d/meta_init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  superset-init:
+    build:
+      context: .
+      dockerfile: docker/superset.Dockerfile
+    image: ul-market-superset:local
+    profiles: [superset]
+    <<: *env
+    depends_on:
+      meta-postgres:
+        condition: service_healthy
+      pipeline:
+        condition: service_completed_successfully
+    command: ["bash", "/app/assets/init.sh"]
+    restart: "no"
+
+  superset:
+    image: ul-market-superset:local
+    profiles: [superset]
+    <<: *env
+    depends_on:
+      superset-init:
+        condition: service_completed_successfully
+    ports:
+      - "${SUPERSET_HOST_PORT:-8088}:8088"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8088/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  airflow-init:
+    <<: *airflow
+    profiles: [airflow]
+    depends_on:
+      meta-postgres:
+        condition: service_healthy
+    environment:
+      <<: *airflow-env
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+    command: ["version"]
+    restart: "no"
+
+  airflow-webserver:
+    <<: *airflow
+    profiles: [airflow]
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    command: ["webserver"]
+    ports:
+      - "${AIRFLOW_HOST_PORT:-8081}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  airflow-scheduler:
+    <<: *airflow
+    profiles: [airflow]
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      # Первый запуск DAG начинается с готового источника и обученной модели.
+      pipeline:
+        condition: service_completed_successfully
+    command: ["scheduler"]
+
+  # Запускает DAG на всём окне источника и завершается с его статусом.
+  airflow-trigger:
+    <<: *airflow
+    profiles: [airflow]
+    depends_on:
+      airflow-scheduler:
+        condition: service_started
+    command: ["bash", "/opt/pipeline/docker/airflow_trigger.sh"]
+    restart: "no"
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8
+    profiles: [clickhouse]
+    <<: *env
+    ports:
+      - "${CLICKHOUSE_HOST_PORT:-58123}:8123"
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user \"$$CLICKHOUSE_USER\" --password \"$$CLICKHOUSE_PASSWORD\" -q 'select 1'"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  clickhouse-mirror:
+    image: ul-market-pipeline:local
+    profiles: [clickhouse]
+    <<: *env
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      pipeline:
+        condition: service_completed_successfully
+    command: ["python", "-m", "etl.clickhouse"]
+    restart: "no"
+
 volumes:
   pgdata:
   artifacts:
+  metadata:
+  airflow-logs:
+  clickhouse-data:

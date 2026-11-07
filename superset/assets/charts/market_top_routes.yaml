@@ -1,0 +1,45 @@
+slice_name: Топ-10 направлений
+description: null
+certified_by: null
+certification_details: null
+viz_type: table
+params:
+  datasource: 18__table
+  viz_type: table
+  query_mode: raw
+  all_columns:
+  - route
+  - trips_count
+  - median_km
+  - median_trip
+  - mom_km_pct
+  - trend_km
+  order_by_cols:
+  - '["trips_count", false]'
+  row_limit: 10
+  adhoc_filters:
+  - expressionType: SQL
+    sqlExpression: route <> 'Все'
+    clause: WHERE
+    filterOptionName: filter_4ed3b8c4
+  include_search: false
+  show_cell_bars: false
+  column_config:
+    median_km:
+      d3NumberFormat: ',.1f'
+    median_trip:
+      d3NumberFormat: ',.0f'
+    mom_km_pct:
+      d3NumberFormat: +.1f
+      showCellBars: false
+  conditional_formatting: []
+  table_timestamp_format: '%Y-%m-%d'
+  time_range: No filter
+  server_pagination: false
+  page_length: 0
+  color_pn: false
+query_context: null
+cache_timeout: null
+uuid: 8fe128b8-5f8b-5853-b940-e575653fd96f
+version: 1.0.0
+dataset_uuid: 7cae1aac-b1b8-55da-946e-104d4277b584

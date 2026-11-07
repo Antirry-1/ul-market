@@ -24,6 +24,11 @@ HASH_QUERIES = {
                md5(string_agg(m::text, ',' order by month, loading_city_gcid, unloading_city_gcid, body_group, weight_category))
         from mart.mart_route_card m
     """,
+    "market_summary": """
+        select count(*), sum(trips_count),
+               md5(string_agg(m::text, ',' order by route, body_group, weight_category, distance_band, month))
+        from mart.mart_market_summary m
+    """,
 }
 
 

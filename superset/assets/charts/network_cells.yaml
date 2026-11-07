@@ -1,0 +1,26 @@
+slice_name: Ячеек в отборе
+description: null
+certified_by: null
+certification_details: null
+viz_type: big_number_total
+params:
+  datasource: 1__table
+  viz_type: big_number_total
+  metric:
+    expressionType: SQL
+    sqlExpression: COUNT(*)
+    label: Ячеек
+    hasCustomLabel: true
+    optionName: metric_b0a4246c
+  adhoc_filters: []
+  header_font_size: 0.4
+  subheader_font_size: 0.15
+  subtitle_font_size: 0.2
+  y_axis_format: SMART_NUMBER
+  subtitle: по выбранным фильтрам
+  time_range: No filter
+query_context: null
+cache_timeout: null
+uuid: d2064e27-8d4b-50e4-bf58-292bf1bf74e4
+version: 1.0.0
+dataset_uuid: e002aaf8-e5e6-57c2-aff1-379d3134deba

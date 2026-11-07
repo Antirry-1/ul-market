@@ -1,0 +1,44 @@
+slice_name: Динамика ставки, ₽/км
+description: null
+certified_by: null
+certification_details: null
+viz_type: echarts_timeseries_line
+params:
+  datasource: 15__table
+  viz_type: echarts_timeseries_line
+  x_axis: month
+  time_grain_sqla: P1M
+  x_axis_sort_asc: true
+  groupby: []
+  row_limit: 1000
+  metrics:
+  - expressionType: SQL
+    sqlExpression: MAX(median_km)
+    label: Медиана__yhat
+    hasCustomLabel: true
+    optionName: metric_d376ff5a
+  - expressionType: SQL
+    sqlExpression: MAX(p25_km)
+    label: Медиана__yhat_lower
+    hasCustomLabel: true
+    optionName: metric_6807d33a
+  - expressionType: SQL
+    sqlExpression: MAX(p75_km)
+    label: Медиана__yhat_upper
+    hasCustomLabel: true
+    optionName: metric_fe55e0ef
+  adhoc_filters: []
+  time_range: No filter
+  show_legend: false
+  rich_tooltip: true
+  tooltipTimeFormat: '%Y-%m'
+  x_axis_time_format: '%Y-%m'
+  y_axis_format: ',.0f'
+  truncateYAxis: false
+  markerEnabled: false
+  color_scheme: market_band
+query_context: null
+cache_timeout: null
+uuid: 87d801ab-c4b8-576f-87d9-c42af243e60e
+version: 1.0.0
+dataset_uuid: 7cae1aac-b1b8-55da-946e-104d4277b584

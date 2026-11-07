@@ -29,6 +29,7 @@ def build_parser() -> argparse.ArgumentParser:
     commands.add_parser("build-marts", help="пересобрать витрину")
     run_all_parser = commands.add_parser("run-all", help="весь конвейер, по умолчанию на окне источника")
     add_window_arguments(run_all_parser)
+    commands.add_parser("summary", help="вывести итог прогона в лог")
     return parser
 
 
@@ -79,6 +80,8 @@ def main(argv: list[str] | None = None) -> None:
         start, end = resolve_window(args, settings)
         init_dwh(settings.dwh_dsn)
         run_all(settings, start, end)
+    elif args.command == "summary":
+        log_summary(settings)
 
 
 if __name__ == "__main__":

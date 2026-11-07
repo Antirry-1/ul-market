@@ -1,0 +1,44 @@
+slice_name: История ячейки
+description: null
+certified_by: null
+certification_details: null
+viz_type: table
+params:
+  datasource: 4__table
+  viz_type: table
+  column_config:
+    p25_trip: &id001
+      d3NumberFormat: ',.0f'
+    median_trip: *id001
+    p75_trip: *id001
+    mom_pct: &id002
+      d3NumberFormat: .2f
+    yoy_pct: *id002
+  query_mode: raw
+  all_columns:
+  - month
+  - p25_trip
+  - median_trip
+  - p75_trip
+  - trips_count
+  - carriers_count
+  - mom_pct
+  - yoy_pct
+  - reliability_level
+  - is_partial_month
+  order_by_cols:
+  - '["month", false]'
+  row_limit: 100
+  adhoc_filters: []
+  include_search: true
+  show_cell_bars: false
+  table_timestamp_format: '%Y-%m-%d'
+  time_range: No filter
+  server_pagination: false
+  page_length: 25
+  color_pn: false
+query_context: null
+cache_timeout: null
+uuid: 6f055dfa-9bf2-5ed2-9b84-7040055ade79
+version: 1.0.0
+dataset_uuid: 2923a2cc-6599-53d6-b693-abdae312b05b

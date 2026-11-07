@@ -1,0 +1,26 @@
+slice_name: Перевозок
+description: null
+certified_by: null
+certification_details: null
+viz_type: big_number_total
+params:
+  datasource: 14__table
+  viz_type: big_number_total
+  metric:
+    expressionType: SQL
+    sqlExpression: MAX(trips_count)
+    label: Рейсов
+    hasCustomLabel: true
+    optionName: metric_681885f5
+  adhoc_filters: []
+  header_font_size: 0.5
+  subheader_font_size: 0.15
+  subtitle_font_size: 0.2
+  y_axis_format: ',d'
+  subtitle: завершённых за месяц
+  time_range: No filter
+query_context: null
+cache_timeout: null
+uuid: adf11e72-56b7-5f7a-a8f3-60d7c5c105ef
+version: 1.0.0
+dataset_uuid: 7cae1aac-b1b8-55da-946e-104d4277b584

@@ -1,0 +1,1066 @@
+dashboard_title: 'Рынок ставок: маршруты и прогноз'
+description: null
+css: ".dashboard {\n  background: #f3f5f7;\n}\n\n.dashboard-component-chart-holder {\n  border: 1px solid #d9e0e7;\n\
+  \  border-radius: 14px;\n  box-shadow: none;\n}\n\n.dashboard-component-chart-holder:has([data-test-chart-name=\"\
+  Индекс ставок\"]) {\n  background: #fde8dc;\n  border-color: #e8590c;\n}\n\n[data-test-chart-name=\"Индекс ставок\"\
+  ] {\n  background: transparent;\n}\n\n.header-line {\n  color: #16202b;\n  font-weight: 700;\n}\n\n.filter-counts\
+  \ {\n  display: none;\n}\n"
+slug: market-rates
+certified_by: null
+certification_details: null
+published: true
+uuid: c2d2924c-f9e9-5746-9a75-46e9ab5f87eb
+position:
+  DASHBOARD_VERSION_KEY: v2
+  ROOT_ID:
+    type: ROOT
+    id: ROOT_ID
+    children:
+    - GRID_ID
+  GRID_ID:
+    type: GRID
+    id: GRID_ID
+    children:
+    - TABS-MAIN
+    parents:
+    - ROOT_ID
+  HEADER_ID:
+    id: HEADER_ID
+    type: HEADER
+    meta:
+      text: 'Рынок ставок: маршруты и прогноз'
+  TABS-MAIN:
+    type: TABS
+    id: TABS-MAIN
+    children:
+    - TAB-MARKET
+    - TAB-NETWORK
+    - TAB-HISTORY
+    - TAB-FORECAST
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    meta: {}
+  CHART-network_cells:
+    type: CHART
+    id: CHART-network_cells
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-NETWORK
+    - ROW-NETWORK-1
+    meta:
+      width: 3
+      height: 16
+      chartId: 1
+      uuid: d2064e27-8d4b-50e4-bf58-292bf1bf74e4
+      sliceName: Ячеек в отборе
+  ROW-NETWORK-1:
+    type: ROW
+    id: ROW-NETWORK-1
+    children:
+    - CHART-network_cells
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-NETWORK
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-network_table:
+    type: CHART
+    id: CHART-network_table
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-NETWORK
+    - ROW-NETWORK-2
+    meta:
+      width: 12
+      height: 90
+      chartId: 2
+      uuid: 28f5a841-b1b6-5a12-8e04-a68f65bef57b
+      sliceName: Сводная таблица маршрутов
+  ROW-NETWORK-2:
+    type: ROW
+    id: ROW-NETWORK-2
+    children:
+    - CHART-network_table
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-NETWORK
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  TAB-NETWORK:
+    type: TAB
+    id: TAB-NETWORK
+    children:
+    - ROW-NETWORK-1
+    - ROW-NETWORK-2
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    meta:
+      text: Маршрутная сеть
+      defaultText: Tab title
+      placeholder: Tab title
+  CHART-route_corridor:
+    type: CHART
+    id: CHART-route_corridor
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-HISTORY
+    - ROW-HISTORY-1
+    meta:
+      width: 12
+      height: 60
+      chartId: 3
+      uuid: 674eeecb-928b-517f-ab04-ce5f16045083
+      sliceName: Коридор ставки по месяцам
+  ROW-HISTORY-1:
+    type: ROW
+    id: ROW-HISTORY-1
+    children:
+    - CHART-route_corridor
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-HISTORY
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-route_history_table:
+    type: CHART
+    id: CHART-route_history_table
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-HISTORY
+    - ROW-HISTORY-2
+    meta:
+      width: 12
+      height: 60
+      chartId: 4
+      uuid: 6f055dfa-9bf2-5ed2-9b84-7040055ade79
+      sliceName: История ячейки
+  ROW-HISTORY-2:
+    type: ROW
+    id: ROW-HISTORY-2
+    children:
+    - CHART-route_history_table
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-HISTORY
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  TAB-HISTORY:
+    type: TAB
+    id: TAB-HISTORY
+    children:
+    - ROW-HISTORY-1
+    - ROW-HISTORY-2
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    meta:
+      text: История маршрута
+      defaultText: Tab title
+      placeholder: Tab title
+  CHART-model_mape:
+    type: CHART
+    id: CHART-model_mape
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-FORECAST
+    - ROW-FORECAST-1
+    meta:
+      width: 3
+      height: 16
+      chartId: 5
+      uuid: 8cbf7c19-e759-56c2-9af5-86ea07cc537f
+      sliceName: MAPE на test
+  CHART-model_r2:
+    type: CHART
+    id: CHART-model_r2
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-FORECAST
+    - ROW-FORECAST-1
+    meta:
+      width: 3
+      height: 16
+      chartId: 6
+      uuid: c6883050-9922-55e9-8b33-a7fdab998fce
+      sliceName: R² на test
+  CHART-above_forecast_count:
+    type: CHART
+    id: CHART-above_forecast_count
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-FORECAST
+    - ROW-FORECAST-1
+    meta:
+      width: 3
+      height: 16
+      chartId: 7
+      uuid: 7a8d1206-dbde-518d-9d11-ab12b62325d0
+      sliceName: Рейсов выше прогноза
+  ROW-FORECAST-1:
+    type: ROW
+    id: ROW-FORECAST-1
+    children:
+    - CHART-model_mape
+    - CHART-model_r2
+    - CHART-above_forecast_count
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-FORECAST
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-fact_vs_forecast_daily:
+    type: CHART
+    id: CHART-fact_vs_forecast_daily
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-FORECAST
+    - ROW-FORECAST-2
+    meta:
+      width: 12
+      height: 50
+      chartId: 8
+      uuid: 9a69e936-f504-5899-a712-02aefe7b24af
+      sliceName: Медиана факта и прогноза по дням
+  ROW-FORECAST-2:
+    type: ROW
+    id: ROW-FORECAST-2
+    children:
+    - CHART-fact_vs_forecast_daily
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-FORECAST
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-model_comparison:
+    type: CHART
+    id: CHART-model_comparison
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-FORECAST
+    - ROW-FORECAST-3
+    meta:
+      width: 12
+      height: 40
+      chartId: 10
+      uuid: eb71d472-459a-5b59-ac8a-79f77cb00670
+      sliceName: Сравнение моделей на test
+  ROW-FORECAST-3:
+    type: ROW
+    id: ROW-FORECAST-3
+    children:
+    - CHART-model_comparison
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-FORECAST
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-above_forecast_table:
+    type: CHART
+    id: CHART-above_forecast_table
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-FORECAST
+    - ROW-FORECAST-4
+    meta:
+      width: 12
+      height: 70
+      chartId: 9
+      uuid: f01b6dd0-3da2-5e4f-b042-42a4842992fd
+      sliceName: 200 рейсов с наибольшим превышением прогноза
+  ROW-FORECAST-4:
+    type: ROW
+    id: ROW-FORECAST-4
+    children:
+    - CHART-above_forecast_table
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-FORECAST
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  TAB-FORECAST:
+    type: TAB
+    id: TAB-FORECAST
+    children:
+    - ROW-FORECAST-1
+    - ROW-FORECAST-2
+    - ROW-FORECAST-3
+    - ROW-FORECAST-4
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    meta:
+      text: Факт и прогноз
+      defaultText: Tab title
+      placeholder: Tab title
+  CHART-market_index:
+    type: CHART
+    id: CHART-market_index
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-MARKET
+    - ROW-MARKET-1
+    meta:
+      width: 3
+      height: 19
+      chartId: 11
+      uuid: 76b7ba17-3707-5766-9323-e02afd08e753
+      sliceName: Индекс ставок
+  CHART-market_trip:
+    type: CHART
+    id: CHART-market_trip
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-MARKET
+    - ROW-MARKET-1
+    meta:
+      width: 3
+      height: 19
+      chartId: 12
+      uuid: 07556d28-df04-5dd0-842f-7fa73b33d181
+      sliceName: Ставка за рейс
+  CHART-market_ytd:
+    type: CHART
+    id: CHART-market_ytd
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-MARKET
+    - ROW-MARKET-1
+    meta:
+      width: 3
+      height: 19
+      chartId: 13
+      uuid: 3ae71212-2787-5f5c-ae33-77e436b54ba2
+      sliceName: С начала года
+  CHART-market_trips:
+    type: CHART
+    id: CHART-market_trips
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-MARKET
+    - ROW-MARKET-1
+    meta:
+      width: 3
+      height: 19
+      chartId: 14
+      uuid: adf11e72-56b7-5f7a-a8f3-60d7c5c105ef
+      sliceName: Перевозок
+  ROW-MARKET-1:
+    type: ROW
+    id: ROW-MARKET-1
+    children:
+    - CHART-market_index
+    - CHART-market_trip
+    - CHART-market_ytd
+    - CHART-market_trips
+    parents: &id001
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-MARKET
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-market_dynamic:
+    type: CHART
+    id: CHART-market_dynamic
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-MARKET
+    - ROW-MARKET-2
+    meta:
+      width: 12
+      height: 55
+      chartId: 15
+      uuid: 87d801ab-c4b8-576f-87d9-c42af243e60e
+      sliceName: Динамика ставки, ₽/км
+  ROW-MARKET-2:
+    type: ROW
+    id: ROW-MARKET-2
+    children:
+    - CHART-market_dynamic
+    parents: *id001
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-market_heatmap:
+    type: CHART
+    id: CHART-market_heatmap
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-MARKET
+    - ROW-MARKET-3
+    meta:
+      width: 6
+      height: 55
+      chartId: 16
+      uuid: ce5cdb34-e91f-5972-8de1-139c9a2d77f0
+      sliceName: 'Тепловая карта: кузов × плечо'
+  CHART-market_bodies:
+    type: CHART
+    id: CHART-market_bodies
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-MARKET
+    - ROW-MARKET-3
+    meta:
+      width: 6
+      height: 55
+      chartId: 17
+      uuid: 86b89785-b08b-5e80-af97-f0161fdafc78
+      sliceName: Ставки по типам кузова
+  ROW-MARKET-3:
+    type: ROW
+    id: ROW-MARKET-3
+    children:
+    - CHART-market_heatmap
+    - CHART-market_bodies
+    parents: *id001
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-market_top_routes:
+    type: CHART
+    id: CHART-market_top_routes
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-MARKET
+    - ROW-MARKET-4
+    meta:
+      width: 12
+      height: 50
+      chartId: 18
+      uuid: 8fe128b8-5f8b-5853-b940-e575653fd96f
+      sliceName: Топ-10 направлений
+  ROW-MARKET-4:
+    type: ROW
+    id: ROW-MARKET-4
+    children:
+    - CHART-market_top_routes
+    parents: *id001
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  MARKDOWN-market-note:
+    type: MARKDOWN
+    id: MARKDOWN-market-note
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    - TAB-MARKET
+    - ROW-MARKET-NOTE
+    meta:
+      width: 12
+      height: 18
+      code: '**Как считается.** Ставки взяты из завершённых перевозок без выбросов. Медиана устойчивее среднего
+        к единичным значениям, коридор идёт от 25-го до 75-го процентиля: внутри него половина сделок. Месяц сделки
+        берётся из дат перевозки, поэтому многомесячная сделка входит в каждый свой месяц.
+
+
+        **Данные синтетические**, дата снимка 2026-10-26. Октябрь 2026 неполный, поэтому по умолчанию выбран сентябрь.'
+  ROW-MARKET-NOTE:
+    type: ROW
+    id: ROW-MARKET-NOTE
+    children:
+    - MARKDOWN-market-note
+    parents: *id001
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  TAB-MARKET:
+    type: TAB
+    id: TAB-MARKET
+    children:
+    - ROW-MARKET-1
+    - ROW-MARKET-2
+    - ROW-MARKET-3
+    - ROW-MARKET-4
+    - ROW-MARKET-NOTE
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - TABS-MAIN
+    meta:
+      text: Обзор рынка
+      defaultText: Tab title
+      placeholder: Tab title
+metadata:
+  native_filter_configuration:
+  - id: NATIVE_FILTER-market-month
+    name: Месяц
+    filterType: filter_select
+    type: NATIVE_FILTER
+    targets:
+    - column:
+        name: month_label
+      datasetUuid: 7cae1aac-b1b8-55da-946e-104d4277b584
+    controlValues:
+      enableEmptyFilter: true
+      defaultToFirstItem: false
+      multiSelect: false
+      searchAllOptions: false
+      inverseSelection: false
+    defaultDataMask:
+      extraFormData:
+        filters:
+        - col: month_label
+          op: IN
+          val:
+          - 2026-09
+      filterState:
+        value:
+        - 2026-09
+      ownState: {}
+    cascadeParentIds: []
+    scope:
+      rootPath:
+      - ROOT_ID
+      excluded:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+      - 15
+    description: ''
+    sortMetric: null
+  - id: NATIVE_FILTER-market-route
+    name: Направление
+    filterType: filter_select
+    type: NATIVE_FILTER
+    targets:
+    - column:
+        name: route
+      datasetUuid: 7cae1aac-b1b8-55da-946e-104d4277b584
+    controlValues:
+      enableEmptyFilter: true
+      defaultToFirstItem: false
+      multiSelect: false
+      searchAllOptions: false
+      inverseSelection: false
+    defaultDataMask:
+      extraFormData:
+        filters:
+        - col: route
+          op: IN
+          val:
+          - Все
+      filterState:
+        value:
+        - Все
+      ownState: {}
+    cascadeParentIds: []
+    scope:
+      rootPath:
+      - ROOT_ID
+      excluded:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+      - 18
+    description: ''
+    sortMetric: null
+  - id: NATIVE_FILTER-market-body
+    name: Тип кузова
+    filterType: filter_select
+    type: NATIVE_FILTER
+    targets:
+    - column:
+        name: body_group
+      datasetUuid: 7cae1aac-b1b8-55da-946e-104d4277b584
+    controlValues:
+      enableEmptyFilter: true
+      defaultToFirstItem: false
+      multiSelect: false
+      searchAllOptions: false
+      inverseSelection: false
+    defaultDataMask:
+      extraFormData:
+        filters:
+        - col: body_group
+          op: IN
+          val:
+          - Все
+      filterState:
+        value:
+        - Все
+      ownState: {}
+    cascadeParentIds: []
+    scope:
+      rootPath:
+      - ROOT_ID
+      excluded:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+      - 16
+      - 17
+    description: ''
+    sortMetric: null
+  - id: NATIVE_FILTER-market-weight
+    name: Тоннаж
+    filterType: filter_select
+    type: NATIVE_FILTER
+    targets:
+    - column:
+        name: weight_category
+      datasetUuid: 7cae1aac-b1b8-55da-946e-104d4277b584
+    controlValues:
+      enableEmptyFilter: true
+      defaultToFirstItem: false
+      multiSelect: false
+      searchAllOptions: false
+      inverseSelection: false
+    defaultDataMask:
+      extraFormData:
+        filters:
+        - col: weight_category
+          op: IN
+          val:
+          - Все
+      filterState:
+        value:
+        - Все
+      ownState: {}
+    cascadeParentIds: []
+    scope:
+      rootPath:
+      - ROOT_ID
+      excluded:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+    description: ''
+    sortMetric: null
+  - id: NATIVE_FILTER-market-band
+    name: Длина плеча
+    filterType: filter_select
+    type: NATIVE_FILTER
+    targets:
+    - column:
+        name: distance_band
+      datasetUuid: 7cae1aac-b1b8-55da-946e-104d4277b584
+    controlValues:
+      enableEmptyFilter: true
+      defaultToFirstItem: false
+      multiSelect: false
+      searchAllOptions: false
+      inverseSelection: false
+    defaultDataMask:
+      extraFormData:
+        filters:
+        - col: distance_band
+          op: IN
+          val:
+          - Все
+      filterState:
+        value:
+        - Все
+      ownState: {}
+    cascadeParentIds: []
+    scope:
+      rootPath:
+      - ROOT_ID
+      excluded:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+      - 16
+    description: ''
+    sortMetric: null
+  - id: NATIVE_FILTER-month
+    name: Месяц
+    filterType: filter_select
+    type: NATIVE_FILTER
+    targets:
+    - column:
+        name: month_label
+      datasetUuid: e002aaf8-e5e6-57c2-aff1-379d3134deba
+    controlValues:
+      enableEmptyFilter: true
+      defaultToFirstItem: false
+      multiSelect: false
+      searchAllOptions: false
+      inverseSelection: false
+    defaultDataMask:
+      extraFormData:
+        filters:
+        - col: month_label
+          op: IN
+          val: &id002
+          - 2026-09
+      filterState:
+        value: *id002
+      ownState: {}
+    cascadeParentIds: []
+    scope:
+      rootPath:
+      - ROOT_ID
+      excluded:
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 17
+      - 18
+    description: ''
+    sortMetric: null
+  - id: NATIVE_FILTER-reliability
+    name: Надёжность
+    filterType: filter_select
+    type: NATIVE_FILTER
+    targets:
+    - column:
+        name: reliability_level
+      datasetUuid: e002aaf8-e5e6-57c2-aff1-379d3134deba
+    controlValues:
+      enableEmptyFilter: false
+      defaultToFirstItem: false
+      multiSelect: true
+      searchAllOptions: false
+      inverseSelection: false
+    defaultDataMask:
+      extraFormData:
+        filters:
+        - col: reliability_level
+          op: IN
+          val: &id003
+          - HIGH
+          - MEDIUM
+      filterState:
+        value: *id003
+      ownState: {}
+    cascadeParentIds: []
+    scope:
+      rootPath:
+      - ROOT_ID
+      excluded:
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 17
+      - 18
+    description: ''
+    sortMetric: null
+  - id: NATIVE_FILTER-from
+    name: Откуда
+    filterType: filter_select
+    type: NATIVE_FILTER
+    targets:
+    - column:
+        name: loading_city
+      datasetUuid: 2923a2cc-6599-53d6-b693-abdae312b05b
+    controlValues:
+      enableEmptyFilter: true
+      defaultToFirstItem: false
+      multiSelect: false
+      searchAllOptions: false
+      inverseSelection: false
+    defaultDataMask:
+      extraFormData:
+        filters:
+        - col: loading_city
+          op: IN
+          val: &id004
+          - Москва
+      filterState:
+        value: *id004
+      ownState: {}
+    cascadeParentIds: []
+    scope:
+      rootPath:
+      - ROOT_ID
+      excluded:
+      - 1
+      - 2
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 17
+      - 18
+    description: ''
+    sortMetric: null
+  - id: NATIVE_FILTER-to
+    name: Куда
+    filterType: filter_select
+    type: NATIVE_FILTER
+    targets:
+    - column:
+        name: unloading_city
+      datasetUuid: 2923a2cc-6599-53d6-b693-abdae312b05b
+    controlValues:
+      enableEmptyFilter: true
+      defaultToFirstItem: false
+      multiSelect: false
+      searchAllOptions: false
+      inverseSelection: false
+    defaultDataMask:
+      extraFormData:
+        filters:
+        - col: unloading_city
+          op: IN
+          val: &id005
+          - Ростов-на-Дону
+      filterState:
+        value: *id005
+      ownState: {}
+    cascadeParentIds: []
+    scope:
+      rootPath:
+      - ROOT_ID
+      excluded:
+      - 1
+      - 2
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 17
+      - 18
+    description: ''
+    sortMetric: null
+  - id: NATIVE_FILTER-body
+    name: Кузов
+    filterType: filter_select
+    type: NATIVE_FILTER
+    targets:
+    - column:
+        name: body_group
+      datasetUuid: 2923a2cc-6599-53d6-b693-abdae312b05b
+    controlValues:
+      enableEmptyFilter: true
+      defaultToFirstItem: false
+      multiSelect: false
+      searchAllOptions: false
+      inverseSelection: false
+    defaultDataMask:
+      extraFormData:
+        filters:
+        - col: body_group
+          op: IN
+          val: &id006
+          - Тент
+      filterState:
+        value: *id006
+      ownState: {}
+    cascadeParentIds: []
+    scope:
+      rootPath:
+      - ROOT_ID
+      excluded:
+      - 1
+      - 2
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 17
+      - 18
+    description: ''
+    sortMetric: null
+  - id: NATIVE_FILTER-weight
+    name: Вес
+    filterType: filter_select
+    type: NATIVE_FILTER
+    targets:
+    - column:
+        name: weight_category
+      datasetUuid: 2923a2cc-6599-53d6-b693-abdae312b05b
+    controlValues:
+      enableEmptyFilter: true
+      defaultToFirstItem: false
+      multiSelect: false
+      searchAllOptions: false
+      inverseSelection: false
+    defaultDataMask:
+      extraFormData:
+        filters:
+        - col: weight_category
+          op: IN
+          val: &id007
+          - FTL
+      filterState:
+        value: *id007
+      ownState: {}
+    cascadeParentIds: []
+    scope:
+      rootPath:
+      - ROOT_ID
+      excluded:
+      - 1
+      - 2
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 17
+      - 18
+    description: ''
+    sortMetric: null
+  color_scheme: ''
+  refresh_frequency: 0
+  expanded_slices: {}
+  label_colors: {}
+  timed_refresh_immune_slices: []
+  cross_filters_enabled: false
+  default_filters: '{}'
+  chart_configuration: {}
+version: 1.0.0

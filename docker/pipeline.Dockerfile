@@ -18,6 +18,8 @@ RUN useradd --create-home --uid 1000 app \
 COPY sql/ sql/
 COPY etl/ etl/
 COPY ml/ ml/
+COPY dags/ dags/
+COPY superset/assets/ superset/assets/
 COPY tests/ tests/
 COPY pytest.ini .
 

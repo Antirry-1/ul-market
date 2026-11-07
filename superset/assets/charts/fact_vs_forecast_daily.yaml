@@ -1,0 +1,50 @@
+slice_name: Медиана факта и прогноза по дням
+description: null
+certified_by: null
+certification_details: null
+viz_type: echarts_timeseries_line
+params:
+  datasource: 8__table
+  viz_type: echarts_timeseries_line
+  x_axis: loading_date
+  time_grain_sqla: P1D
+  x_axis_sort_asc: true
+  groupby: []
+  row_limit: 1000
+  adhoc_filters:
+  - expressionType: SQL
+    sqlExpression: split = 'test'
+    clause: WHERE
+    filterOptionName: filter_0a0f74a5
+  - expressionType: SQL
+    sqlExpression: not outlier_mark
+    clause: WHERE
+    filterOptionName: filter_d77bd87d
+  time_range: No filter
+  show_legend: true
+  legendOrientation: top
+  rich_tooltip: true
+  tooltipTimeFormat: '%Y-%m-%d'
+  x_axis_time_format: '%Y-%m-%d'
+  y_axis_format: SMART_NUMBER
+  markerEnabled: true
+  markerSize: 4
+  truncateYAxis: false
+  y_axis_title_margin: 15
+  x_axis_title_margin: 15
+  metrics:
+  - expressionType: SQL
+    sqlExpression: percentile_cont(0.5) WITHIN GROUP (ORDER BY actual_price_rub)
+    label: Факт
+    hasCustomLabel: true
+    optionName: metric_3953eab3
+  - expressionType: SQL
+    sqlExpression: percentile_cont(0.5) WITHIN GROUP (ORDER BY predicted_price_rub)
+    label: Прогноз
+    hasCustomLabel: true
+    optionName: metric_3e5798fc
+query_context: null
+cache_timeout: null
+uuid: 9a69e936-f504-5899-a712-02aefe7b24af
+version: 1.0.0
+dataset_uuid: f7e1ed89-4019-5d47-88b1-286313344a6f

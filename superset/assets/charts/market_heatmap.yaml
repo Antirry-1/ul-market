@@ -1,0 +1,50 @@
+slice_name: 'Тепловая карта: кузов × плечо'
+description: null
+certified_by: null
+certification_details: null
+viz_type: heatmap_v2
+params:
+  datasource: 16__table
+  viz_type: heatmap_v2
+  x_axis: distance_band
+  groupby: body_group
+  metric:
+    expressionType: SQL
+    sqlExpression: MAX(median_km)
+    label: ₽/км
+    hasCustomLabel: true
+    optionName: metric_443ba75f
+  adhoc_filters:
+  - expressionType: SQL
+    sqlExpression: body_group <> 'Все'
+    clause: WHERE
+    filterOptionName: filter_83d877a4
+  - expressionType: SQL
+    sqlExpression: distance_band <> 'Все'
+    clause: WHERE
+    filterOptionName: filter_fcb43a90
+  row_limit: 100
+  sort_x_axis: value_desc
+  sort_y_axis: alpha_asc
+  linear_color_scheme: market_heat
+  normalize_across: heatmap
+  show_values: true
+  show_legend: true
+  legend_type: continuous
+  y_axis_format: ',.0f'
+  time_range: No filter
+  xscale_interval: -1
+  yscale_interval: -1
+  left_margin: auto
+  bottom_margin: auto
+  border_width: 2
+  border_color:
+    r: 255
+    g: 255
+    b: 255
+    a: 1
+query_context: null
+cache_timeout: null
+uuid: ce5cdb34-e91f-5972-8de1-139c9a2d77f0
+version: 1.0.0
+dataset_uuid: 7cae1aac-b1b8-55da-946e-104d4277b584

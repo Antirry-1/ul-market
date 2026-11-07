@@ -1,0 +1,49 @@
+slice_name: Сводная таблица маршрутов
+description: null
+certified_by: null
+certification_details: null
+viz_type: table
+params:
+  datasource: 2__table
+  viz_type: table
+  column_config:
+    p25_trip: &id001
+      d3NumberFormat: ',.0f'
+    median_trip: *id001
+    p75_trip: *id001
+    median_km: &id002
+      d3NumberFormat: .2f
+    mom_pct: *id002
+    yoy_pct: *id002
+  query_mode: raw
+  all_columns:
+  - loading_city
+  - unloading_city
+  - body_group
+  - weight_category
+  - p25_trip
+  - median_trip
+  - p75_trip
+  - median_km
+  - trips_count
+  - carriers_count
+  - mom_pct
+  - yoy_pct
+  - reliability_level
+  - is_partial_month
+  order_by_cols:
+  - '["trips_count", false]'
+  row_limit: 1000
+  adhoc_filters: []
+  include_search: true
+  show_cell_bars: false
+  table_timestamp_format: '%Y-%m-%d'
+  time_range: No filter
+  server_pagination: false
+  page_length: 25
+  color_pn: false
+query_context: null
+cache_timeout: null
+uuid: 28f5a841-b1b6-5a12-8e04-a68f65bef57b
+version: 1.0.0
+dataset_uuid: e002aaf8-e5e6-57c2-aff1-379d3134deba

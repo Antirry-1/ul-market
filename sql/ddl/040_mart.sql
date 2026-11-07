@@ -29,6 +29,44 @@ create table if not exists mart.mart_route_card (
 create index if not exists mart_route_card_month_reliability_idx
     on mart.mart_route_card (month, reliability_level);
 
+-- Сводка рынка: готовый срез на каждое сочетание фильтров, значение «Все» означает срез без этого фильтра.
+-- Перцентили не складываются, поэтому собрать их из ячеек карточки маршрута нельзя.
+create table if not exists mart.mart_market_summary (
+    month            date not null,
+    route            text not null,
+    body_group       text not null,
+    weight_category  text not null,
+    distance_band    text not null,
+    p25_km           numeric(12, 2) not null,
+    median_km        numeric(12, 2) not null,
+    p75_km           numeric(12, 2) not null,
+    median_trip      numeric(14, 2) not null,
+    median_distance  numeric(10, 1) not null,
+    trips_count      integer not null,
+    mom_km_pct       numeric(12, 2),
+    ytd_km_pct       numeric(12, 2),
+    trend_km         text not null,
+    is_partial_month boolean not null,
+    as_of            date not null,
+    primary key (route, body_group, weight_category, distance_band, month)
+);
+create index if not exists mart_market_summary_month_idx
+    on mart.mart_market_summary (month, body_group, weight_category, distance_band);
+
+-- Мини-график строкой: значения приводятся к восьми уровням от минимума до максимума ряда.
+create or replace function mart.sparkline(val numeric[]) returns text
+language sql immutable as $$
+    select string_agg(
+        case
+            when bounds.high = bounds.low then '▄'
+            else substr('▁▂▃▄▅▆▇█', 1 + floor(7 * (item.value - bounds.low) / (bounds.high - bounds.low))::int, 1)
+        end,
+        '' order by item.position
+    )
+    from unnest(val) with ordinality as item(value, position)
+    cross join (select min(v) as low, max(v) as high from unnest(val) as v) bounds
+$$;
+
 create table if not exists mart.ml_price_predictions (
     price_id            bigint not null,
     loading_date        date not null,

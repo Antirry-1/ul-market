@@ -1,0 +1,40 @@
+slice_name: Ставки по типам кузова
+description: null
+certified_by: null
+certification_details: null
+viz_type: table
+params:
+  datasource: 17__table
+  viz_type: table
+  query_mode: raw
+  all_columns:
+  - body_group
+  - median_km
+  - mom_km_pct
+  order_by_cols:
+  - '["median_km", false]'
+  row_limit: 20
+  adhoc_filters:
+  - expressionType: SQL
+    sqlExpression: body_group <> 'Все'
+    clause: WHERE
+    filterOptionName: filter_83d877a4
+  include_search: false
+  show_cell_bars: true
+  column_config:
+    median_km:
+      d3NumberFormat: ',.1f'
+    mom_km_pct:
+      d3NumberFormat: +.1f
+      showCellBars: false
+  conditional_formatting: []
+  table_timestamp_format: '%Y-%m-%d'
+  time_range: No filter
+  server_pagination: false
+  page_length: 0
+  color_pn: false
+query_context: null
+cache_timeout: null
+uuid: 86b89785-b08b-5e80-af97-f0161fdafc78
+version: 1.0.0
+dataset_uuid: 7cae1aac-b1b8-55da-946e-104d4277b584

@@ -1,0 +1,55 @@
+slice_name: 200 рейсов с наибольшим превышением прогноза
+description: null
+certified_by: null
+certification_details: null
+viz_type: table
+params:
+  datasource: 9__table
+  viz_type: table
+  column_config:
+    actual_price_rub: &id001
+      d3NumberFormat: ',.0f'
+    predicted_price_rub: *id001
+    deviation_pct:
+      d3NumberFormat: .2f
+    p75_trip: *id001
+  query_mode: raw
+  all_columns:
+  - price_id
+  - loading_date
+  - loading_city
+  - unloading_city
+  - body_group
+  - actual_price_rub
+  - predicted_price_rub
+  - deviation_pct
+  - p75_trip
+  - is_above_corridor
+  order_by_cols:
+  - '["deviation_pct", false]'
+  row_limit: 200
+  adhoc_filters:
+  - expressionType: SQL
+    sqlExpression: split = 'test'
+    clause: WHERE
+    filterOptionName: filter_0a0f74a5
+  - expressionType: SQL
+    sqlExpression: not outlier_mark
+    clause: WHERE
+    filterOptionName: filter_d77bd87d
+  - expressionType: SQL
+    sqlExpression: is_above_forecast
+    clause: WHERE
+    filterOptionName: filter_6a5a88d6
+  include_search: true
+  show_cell_bars: false
+  table_timestamp_format: '%Y-%m-%d'
+  time_range: No filter
+  server_pagination: false
+  page_length: 25
+  color_pn: false
+query_context: null
+cache_timeout: null
+uuid: f01b6dd0-3da2-5e4f-b042-42a4842992fd
+version: 1.0.0
+dataset_uuid: f7e1ed89-4019-5d47-88b1-286313344a6f

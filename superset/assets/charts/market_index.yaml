@@ -1,0 +1,26 @@
+slice_name: Индекс ставок
+description: null
+certified_by: null
+certification_details: null
+viz_type: big_number_total
+params:
+  datasource: 11__table
+  viz_type: big_number_total
+  metric:
+    expressionType: SQL
+    sqlExpression: MAX(median_km)
+    label: ₽/км
+    hasCustomLabel: true
+    optionName: metric_443ba75f
+  adhoc_filters: []
+  header_font_size: 0.5
+  subheader_font_size: 0.15
+  subtitle_font_size: 0.2
+  y_axis_format: ',.1f'
+  subtitle: ₽/км, медиана за месяц
+  time_range: No filter
+query_context: null
+cache_timeout: null
+uuid: 76b7ba17-3707-5766-9323-e02afd08e753
+version: 1.0.0
+dataset_uuid: 7cae1aac-b1b8-55da-946e-104d4277b584

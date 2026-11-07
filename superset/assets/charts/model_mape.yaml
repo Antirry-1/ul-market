@@ -1,0 +1,38 @@
+slice_name: MAPE на test
+description: null
+certified_by: null
+certification_details: null
+viz_type: big_number_total
+params:
+  datasource: 5__table
+  viz_type: big_number_total
+  metric:
+    expressionType: SQL
+    sqlExpression: MAX(mape_pct)
+    label: MAPE, %
+    hasCustomLabel: true
+    optionName: metric_01ddb913
+  adhoc_filters:
+  - expressionType: SQL
+    sqlExpression: model_name = 'catboost_price_v1'
+    clause: WHERE
+    filterOptionName: filter_c25eed60
+  - expressionType: SQL
+    sqlExpression: split = 'test'
+    clause: WHERE
+    filterOptionName: filter_0a0f74a5
+  - expressionType: SQL
+    sqlExpression: slice = 'no_outliers'
+    clause: WHERE
+    filterOptionName: filter_e70a068c
+  header_font_size: 0.4
+  subheader_font_size: 0.15
+  subtitle_font_size: 0.2
+  y_axis_format: .2f
+  subtitle: '%, без выбросов'
+  time_range: No filter
+query_context: null
+cache_timeout: null
+uuid: 8cbf7c19-e759-56c2-9af5-86ea07cc537f
+version: 1.0.0
+dataset_uuid: 3358b501-53b1-52a5-8802-8eba0d8005fc

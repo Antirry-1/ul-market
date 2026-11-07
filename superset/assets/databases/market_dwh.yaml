@@ -1,0 +1,13 @@
+database_name: market_dwh
+sqlalchemy_uri: postgresql+psycopg2://bi_reader:XXXXXXXXXX@postgres:5432/dwh
+cache_timeout: null
+expose_in_sqllab: true
+allow_run_async: false
+allow_ctas: false
+allow_cvas: false
+allow_dml: false
+allow_file_upload: false
+extra:
+  allows_virtual_table_explore: true
+uuid: b8ce183b-187e-5482-8b4e-20c207a8cd89
+version: 1.0.0
