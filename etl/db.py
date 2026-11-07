@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -12,6 +13,16 @@ SQL_DIR = Path(__file__).resolve().parent.parent / "sql"
 
 # Один ключ на весь пайплайн: два прогона не должны менять хранилище одновременно.
 PIPELINE_LOCK_KEY = 7_260_101
+
+# Сколько шаг ждёт, пока другой прогон отпустит хранилище. Обычный полный прогон укладывается
+# в несколько минут, так что дольше ждать бессмысленно: задача планировщика должна упасть
+# с понятной причиной, а не висеть. Формат значения как у lock_timeout в PostgreSQL.
+PIPELINE_LOCK_TIMEOUT_ENV = "PIPELINE_LOCK_TIMEOUT"
+DEFAULT_PIPELINE_LOCK_TIMEOUT = "15min"
+
+
+class PipelineBusy(RuntimeError):
+    """Хранилище занято другим прогоном дольше, чем разрешено ждать."""
 
 
 def connect(dsn: str, *, autocommit: bool = False) -> psycopg.Connection:
@@ -36,8 +47,18 @@ def set_params(conn: psycopg.Connection, **params: object) -> None:
 
 @contextmanager
 def pipeline_lock(dsn: str) -> Iterator[None]:
+    timeout = os.environ.get(PIPELINE_LOCK_TIMEOUT_ENV) or DEFAULT_PIPELINE_LOCK_TIMEOUT
     with connect(dsn, autocommit=True) as conn:
-        conn.execute("select pg_advisory_lock(%s)", (PIPELINE_LOCK_KEY,))
+        # lock_timeout ограничивает и ожидание advisory-блокировки. Соединение служит только
+        # для блокировки, поэтому настройка на сессию ничего другого не задевает.
+        conn.execute("select set_config('lock_timeout', %s, false)", (timeout,))
+        try:
+            conn.execute("select pg_advisory_lock(%s)", (PIPELINE_LOCK_KEY,))
+        except psycopg.errors.LockNotAvailable as error:
+            raise PipelineBusy(
+                f"Хранилище занято другим прогоном: блокировка не освободилась за {timeout} "
+                f"({PIPELINE_LOCK_TIMEOUT_ENV})"
+            ) from error
         try:
             yield
         finally:

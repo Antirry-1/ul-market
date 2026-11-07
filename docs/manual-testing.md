@@ -7,11 +7,14 @@
 ## 1. Чистый запуск
 
 ```bash
-docker compose down -v      # удалит данные прошлых запусков
+# удалит данные прошлых запусков, в том числе Superset, Airflow и ClickHouse
+docker compose --profile superset --profile airflow --profile clickhouse down -v
 docker-compose up --build -d
 docker wait ul-market-pipeline-1
 docker compose logs pipeline | grep pipeline_summary
 ```
+
+Профили в `down` нужны: без них `-v` удаляет только том PostgreSQL и артефакты модели. Метаданные Superset и Airflow, логи Airflow и данные ClickHouse тогда остаются, и в Airflow будут видны запуски прошлого стенда.
 
 `docker wait` должен напечатать `0`, а в логе должно появиться событие `pipeline_summary`. В `docker compose ps -a` остаётся работать только `postgres`, `source-seed` и `pipeline` завершаются с кодом 0.
 
@@ -23,7 +26,7 @@ docker compose logs pipeline | grep pipeline_summary
 docker compose exec -T postgres psql -U postgres -d dwh -qAtX -v ON_ERROR_STOP=1 < sql/queries/table_hashes.sql
 ```
 
-Запрос выводит число строк и md5 по каждой таблице. Время загрузки, номер батча и время скоринга в хэш не входят, поэтому от запуска к запуску он не меняется. Должно получиться 13 строк:
+Запрос выводит число строк и md5 по каждой таблице. Время загрузки, номер батча, время скоринга и версия модели в хэш не входят, поэтому от запуска к запуску он не меняется. Должно получиться 13 строк:
 
 | Таблица | Строк и хэш |
 |---|---|
@@ -37,7 +40,7 @@ docker compose exec -T postgres psql -U postgres -d dwh -qAtX -v ON_ERROR_STOP=1
 | `core.bridge_price_body_group` | `335077\|e19c42eb2847248ab06cc94506b697a2` |
 | `dq.dq_quarantine_prices` | `203\|b0fda1dbc3152eb3e890827107b46f8a` |
 | `mart.mart_route_card` | `203644\|33a31b9e318fae32264d0f1b774fef90` |
-| `mart.ml_price_predictions` | `17969\|e3e01892a1820d437456285df041f006` |
+| `mart.ml_price_predictions` | `17969\|53364ef584b429e98ef34f3110ddee37` |
 | `mart.ml_model_metrics` | `93\|cb7c15e45b2810949662c2b8b9f3e750` |
 | `mart.mart_market_summary` | `1032935\|9a06699da8fd3d58d2511fffa10fe505` |
 
@@ -56,6 +59,7 @@ docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$DWH_DB"' < 
 - из 300 000 сделок источника 299 797 в `core` и 203 в карантине, то есть каждая учтена ровно один раз;
 - ячеек `LOW_DATA` 202 710, `MEDIUM` 924, `HIGH` 10;
 - у маршрута Москва → Ростов-на-Дону, Тент, FTL 13 месяцев истории без пропусков, поэтому `mom_pct` и `yoy_pct` заполнены везде, а октябрь 2026 отмечен `is_partial_month`;
+- у заявок на декабрь в `corridor_month` стоит октябрь 2026: месяца погрузки в витрине ещё нет, и прогноз стоит рядом с последним коридором своей ячейки;
 - в журнале запусков шаги `load`, `build-marts`, `ml-train`, `ml-score` и `ml-ablation` в статусе `success`, `load` прочитал 300 000 строк, загрузил 299 797, в карантин отправил 203.
 
 Метрики на test, 12 808 строк без размеченных выбросов:
@@ -74,11 +78,12 @@ docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$DWH_DB"' < 
 
 ```bash
 docker compose exec -T postgres psql -U postgres -d dwh -c "
-select split, count(*), count(actual_price_rub) as with_actual, count(abs_error_rub) as with_error
+select split, count(*), count(actual_price_rub) as with_actual, count(abs_error_rub) as with_error,
+       min(trained_through), max(trained_through)
 from mart.ml_price_predictions group by split order by split"
 ```
 
-У `future` должно быть 4 891 строка с нулями в `with_actual` и `with_error`, у `test` 13 078 строк с фактом во всех.
+У `future` должно быть 4 891 строка с нулями в `with_actual` и `with_error`, у `test` 13 078 строк с фактом во всех. В `trained_through` у `future` везде `2026-10-26`, у `test` везде `2026-10-04`: будущие заявки оценивает модель, обученная на всей истории до даты снимка, а `test` модель, которая тестового периода не видела.
 
 ## 4. Тесты
 
@@ -87,7 +92,20 @@ docker compose run --rm pipeline pytest
 docker compose run --rm pipeline pytest -m stand -s
 ```
 
-Первая команда даёт 200 passed. Тесты создают свои базы `ul_test_*` и рабочие данные не трогают. Вторая даёт 4 passed: она сравнивает ошибку модели с пределом, который задаёт шум генератора.
+Первая команда даёт 251 passed. Тесты создают свои базы `ul_test_*` и рабочие данные не трогают. В `.env.example` стоит `REQUIRE_DB=1`, поэтому без доступной базы интеграционные тесты падают, а не пропускаются молча. Вторая даёт 4 passed: она сравнивает ошибку модели с пределом, который задаёт шум генератора.
+
+Те же тесты запускает GitHub Actions ([.github/workflows/tests.yml](../.github/workflows/tests.yml)). Его шаги можно повторить локально, на отдельном проекте compose и маленьком источнике:
+
+```bash
+export COMPOSE_PROJECT_NAME=ul-market-ci
+docker compose build pipeline
+docker compose run --rm -e N_PRICES=2000 source-seed
+docker compose run --rm --no-deps pipeline pytest
+docker compose down -v
+unset COMPOSE_PROJECT_NAME
+```
+
+Результат тот же, 251 passed, вместе со сборкой около полутора минут, если образ уже в кэше. Без `COMPOSE_PROJECT_NAME` команды попали бы в основной проект `ul-market`, и `down -v` в конце удалил бы его тома вместе с загруженным источником и хранилищем.
 
 ## 5. Повторный прогон
 
@@ -105,7 +123,7 @@ docker-compose --profile superset up --build -d
 docker wait ul-market-superset-init-1
 ```
 
-После `0` от `docker wait` откройте http://localhost:8088 (логин `admin`, пароль `local_superset_admin_change_me`, это значение `SUPERSET_ADMIN_PASSWORD` из `.env.example`) и дашборд «Рынок ставок: маршруты и прогноз». На всех четырёх вкладках графики должны строиться без ошибок. На «Истории маршрута» по умолчанию выбран Москва → Ростов-на-Дону, Тент, FTL. Таблица «История ячейки» должна совпасть с историей из шага 3, медиана за сентябрь 2026 равна 126 395,50.
+После `0` от `docker wait` откройте http://localhost:8088 (логин `admin`, пароль `local_superset_admin_change_me`, это значение `SUPERSET_ADMIN_PASSWORD` из `.env.example`) и дашборд «Рынок ставок: маршруты и прогноз». На всех четырёх вкладках графики должны строиться без ошибок. На «Истории маршрута» по умолчанию выбран Москва → Ростов-на-Дону, Тент, FTL. Таблица «История ячейки» показывает все 37 месяцев. Последние 13 должны совпасть с историей из шага 3, где запрос ограничен 13 строками, медиана за сентябрь 2026 равна 126 395,50. Жёлтый ⚠ у «Топ-10 направлений» и «200 рейсов с наибольшим превышением прогноза» ошибкой не считается: таблицы показывают первые N строк, и Superset так предупреждает, что лимит строк достигнут.
 
 ## 7. Airflow
 

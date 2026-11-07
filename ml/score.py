@@ -1,10 +1,16 @@
-"""Пакетный скоринг отложенного периода и будущих заявок, оценка на test."""
+"""Пакетный скоринг отложенного периода и будущих заявок, оценка на test.
+
+Строки test оценивает модель, обученная только на train: по ним считаются метрики.
+Будущие заявки оценивает модель, обученная на всей истории до as_of, см. ml/train.py.
+Какая модель дала прогноз, видно по trained_through, последней дате её обучающих данных.
+"""
 
 from __future__ import annotations
 
 import io
-import json
 import logging
+from dataclasses import dataclass
+from pathlib import Path
 
 import joblib
 import numpy as np
@@ -13,10 +19,11 @@ import psycopg
 from catboost import CatBoostRegressor
 
 from etl.config import Settings
-from etl.db import connect, pipeline_lock
+from etl.db import connect
 from etl.log import log_event, setup_logging
-from etl.runs import tracked_run
+from etl.runs import locked_run
 from ml import storage
+from ml.baseline import LogRidge
 from ml.boosting import predict_boosting
 from ml.features import TARGET, read_features
 from ml.metrics import sliced_metrics
@@ -27,12 +34,14 @@ logger = logging.getLogger(__name__)
 PREDICTION_COLUMNS = (
     "price_id", "loading_date", "loading_city_gcid", "unloading_city_gcid", "body_group",
     "actual_price_rub", "predicted_price_rub", "abs_error_rub", "ape_pct",
-    "model_name", "split", "outlier_mark",
+    "model_name", "split", "outlier_mark", "model_release", "trained_through",
 )
 
 
-def build_predictions(frame: pd.DataFrame, predicted: np.ndarray, model_name: str) -> pd.DataFrame:
+def build_predictions(frame: pd.DataFrame, predicted: np.ndarray, model_name: str,
+                      model_release: str, bounds: SplitBounds) -> pd.DataFrame:
     is_test = frame["split"] == "test"
+    trained_through = frame["split"].map({"test": bounds.train_through, "future": bounds.as_of})
     actual = frame[TARGET].where(is_test)
     abs_error = (actual - predicted).abs()
     return pd.DataFrame({
@@ -49,6 +58,8 @@ def build_predictions(frame: pd.DataFrame, predicted: np.ndarray, model_name: st
         "model_name": model_name,
         "split": frame["split"],
         "outlier_mark": frame["outlier_mark"],
+        "model_release": model_release,
+        "trained_through": trained_through,
     })
 
 
@@ -63,18 +74,35 @@ def write_predictions(conn: psycopg.Connection, predictions: pd.DataFrame, model
         copy.write(buffer.getvalue())
 
 
+@dataclass(frozen=True)
+class MainModel:
+    booster: CatBoostRegressor
+    ridge: LogRidge
+
+    @classmethod
+    def load(cls, release: Path, booster_file: str, ridge_file: str) -> "MainModel":
+        booster = CatBoostRegressor()
+        booster.load_model(str(release / booster_file))
+        return cls(booster, joblib.load(release / ridge_file))
+
+    def predict(self, frame: pd.DataFrame, meta: dict) -> np.ndarray:
+        if frame.empty:
+            return np.empty(0)
+        level = self.ridge if meta["params"]["level_offset"] else None
+        return predict_boosting(self.booster, frame, meta["features"], meta["params"]["log_target"], level)
+
+
 def score(settings: Settings) -> None:
     bounds = SplitBounds.from_as_of(settings.as_of)
 
-    with pipeline_lock(settings.dwh_dsn), tracked_run(settings.dwh_dsn, "ml-score") as run:
+    with locked_run(settings.dwh_dsn, "ml-score") as run:
         # Под блокировкой: обучение не подменит файлы, пока они читаются.
         release = storage.current_release(settings.model_dir)
-        meta = json.loads((release / storage.META_FILE).read_text(encoding="utf-8"))
-        features = meta["features"]
-        log_target = meta["params"]["log_target"]
-        booster = CatBoostRegressor()
-        booster.load_model(str(release / storage.CATBOOST_FILE))
-        ridge = joblib.load(release / storage.RIDGE_FILE)
+        meta = storage.read_meta(release)
+        storage.check_split(meta, bounds)
+        storage.check_files(release)
+        evaluated = MainModel.load(release, storage.CATBOOST_FILE, storage.RIDGE_FILE)
+        forecast = MainModel.load(release, storage.FORECAST_CATBOOST_FILE, storage.FORECAST_RIDGE_FILE)
         baseline = joblib.load(release / storage.BASELINE_FILE)
 
         with connect(settings.dwh_dsn) as conn:
@@ -82,22 +110,23 @@ def score(settings: Settings) -> None:
         frame["split"] = assign_split(frame["loading_date"], bounds)
         frame = frame.reset_index(drop=True)
 
-        level = ridge if meta["params"]["level_offset"] else None
-        predicted = predict_boosting(booster, frame, features, log_target, level)
-        predictions = build_predictions(frame, predicted, storage.MAIN_MODEL)
-
         test_mask = (frame["split"] == "test").to_numpy()
         test = frame[test_mask]
+        predicted = np.empty(len(frame))
+        predicted[test_mask] = evaluated.predict(test, meta)
+        predicted[~test_mask] = forecast.predict(frame[~test_mask], meta)
+        predictions = build_predictions(frame, predicted, storage.MAIN_MODEL, meta["release"], bounds)
+
         metrics = {
             storage.MAIN_MODEL: sliced_metrics(test, predicted[test_mask]),
-            storage.RIDGE_MODEL: sliced_metrics(test, ridge.predict(test)),
+            storage.RIDGE_MODEL: sliced_metrics(test, evaluated.ridge.predict(test)),
             storage.BASELINE_MODEL: sliced_metrics(test, baseline.predict(test)),
         }
 
         with connect(settings.dwh_dsn) as conn:
             write_predictions(conn, predictions, storage.MAIN_MODEL)
             for name, values in metrics.items():
-                storage.write_metrics(conn, name, "test", values)
+                storage.write_metrics(conn, name, "test", values, model_release=meta["release"])
 
         for name, values in metrics.items():
             log_event(logger, "test_metrics", model=name, slice="no_outliers", **values["no_outliers"])
@@ -106,7 +135,8 @@ def score(settings: Settings) -> None:
         counts = predictions["split"].value_counts().to_dict()
         run.rows_read = len(frame)
         run.rows_loaded = len(predictions)
-        run.details["predictions"] = counts
+        run.details.update(predictions=counts, model_release=meta["release"],
+                           train_run_id=meta.get("train_run_id"))
 
 
 def main() -> None:

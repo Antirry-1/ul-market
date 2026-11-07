@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import date, timedelta
 
 import pandas as pd
@@ -28,6 +28,19 @@ class SplitBounds:
             test_start=test_start,
             as_of=as_of,
         )
+
+    @property
+    def train_through(self) -> date:
+        """Последняя дата погрузки в обучении модели, по которой считаются метрики test."""
+        return self.test_start - timedelta(days=1)
+
+    @property
+    def history_end(self) -> date:
+        """Конец истории для модели будущих заявок, не включительно: в неё входит и as_of."""
+        return self.as_of + timedelta(days=1)
+
+    def as_dict(self) -> dict[str, str]:
+        return {name: value.isoformat() for name, value in asdict(self).items()}
 
 
 def assign_split(loading_date: pd.Series, bounds: SplitBounds) -> pd.Series:

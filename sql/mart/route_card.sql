@@ -14,35 +14,10 @@ insert into stg_route_card (
 with params as (
     select current_setting('app.as_of')::date as as_of
 ),
--- Ровно одна строка на сделку, месяц и группу кузова. Дедупликация именно здесь:
--- DISTINCT в агрегатах не исправил бы avg, stddev и перцентили.
--- Будущие даты отсекаются построчно: у исторической сделки могут быть плановые месяцы.
+-- Отбор и дедупликация в core.market_deal_months: одна строка на сделку, месяц и группу кузова.
 base as (
-    select
-        f.price_id,
-        date_trunc('month', d.price_date)::date as month,
-        f.loading_city_gcid,
-        f.unloading_city_gcid,
-        b.body_group,
-        f.weight_category,
-        f.price_rub,
-        f.price_rub::double precision / nullif(f.distance, 0) as price_km,
-        f.organization_id,
-        f.price_type,
-        max(d.price_date) as last_date
-    from core.fact_price f
-    join core.fact_price_date d on d.price_id = f.price_id
-    join core.bridge_price_body_group b on b.price_id = f.price_id
-    cross join params
-    where f.is_fact
-      and f.price_type in (1, 2, 3, 4, 5, 9)
-      and not f.complex
-      and not f.outlier_mark
-      and f.price > 0
-      and f.distance > 0
-      and f.price_rub > 0
-      and d.price_date <= params.as_of
-    group by f.price_id, date_trunc('month', d.price_date), b.body_group
+    select *
+    from core.market_deal_months(current_setting('app.as_of')::date)
 ),
 agg as (
     select
@@ -71,8 +46,8 @@ select
     cur.unloading_city_gcid,
     cur.body_group,
     cur.weight_category,
-    origin.city_name,
-    destination.city_name,
+    origin.city_label,
+    destination.city_label,
     round(cur.p25_trip::numeric, 2),
     round(cur.median_trip::numeric, 2),
     round(cur.p75_trip::numeric, 2),
@@ -99,8 +74,8 @@ select
     params.as_of
 from agg cur
 cross join params
-join core.dim_city origin on origin.gc_id = cur.loading_city_gcid
-join core.dim_city destination on destination.gc_id = cur.unloading_city_gcid
+join core.v_city_label origin on origin.gc_id = cur.loading_city_gcid
+join core.v_city_label destination on destination.gc_id = cur.unloading_city_gcid
 -- Календарное сравнение через self-join: LAG при пропуске месяца взял бы последний доступный.
 left join agg prev_month
        on prev_month.loading_city_gcid = cur.loading_city_gcid

@@ -1,5 +1,6 @@
 -- Сводка рынка: месяц x направление x группа кузова x вес x плечо, по каждому фильтру есть срез «Все».
--- Отбор строк тот же, что у карточки маршрута. Совпадение проверяет аудит summary_matches_route_card.
+-- Строки берутся из core.market_deal_months, как у карточки маршрута. Совпадение проверяет аудит
+-- summary_matches_route_card.
 
 create temp table stg_market_summary (like mart.mart_market_summary) on commit drop;
 
@@ -13,34 +14,22 @@ with params as (
 ),
 base as (
     select
-        f.price_id,
-        date_trunc('month', d.price_date)::date as month,
-        origin.city_name || ' → ' || destination.city_name as route,
-        b.body_group,
-        f.weight_category,
+        m.price_id,
+        m.month,
+        origin.city_label || ' → ' || destination.city_label as route,
+        m.body_group,
+        m.weight_category,
         case
-            when f.distance < 300 then 'до 300 км'
-            when f.distance < 1000 then '300–1000 км'
+            when m.distance < 300 then 'до 300 км'
+            when m.distance < 1000 then '300–1000 км'
             else '1000+ км'
         end as distance_band,
-        f.price_rub::double precision as price_rub,
-        f.price_rub::double precision / nullif(f.distance, 0) as price_km,
-        f.distance::double precision as distance
-    from core.fact_price f
-    join core.fact_price_date d on d.price_id = f.price_id
-    join core.bridge_price_body_group b on b.price_id = f.price_id
-    join core.dim_city origin on origin.gc_id = f.loading_city_gcid
-    join core.dim_city destination on destination.gc_id = f.unloading_city_gcid
-    cross join params
-    where f.is_fact
-      and f.price_type in (1, 2, 3, 4, 5, 9)
-      and not f.complex
-      and not f.outlier_mark
-      and f.price > 0
-      and f.distance > 0
-      and f.price_rub > 0
-      and d.price_date <= params.as_of
-    group by f.price_id, date_trunc('month', d.price_date), b.body_group, origin.gc_id, destination.gc_id
+        m.price_rub::double precision as price_rub,
+        m.price_km,
+        m.distance
+    from core.market_deal_months(current_setting('app.as_of')::date) m
+    join core.v_city_label origin on origin.gc_id = m.loading_city_gcid
+    join core.v_city_label destination on destination.gc_id = m.unloading_city_gcid
 ),
 -- Сделка с двумя группами кузова есть в base дважды. Срез «Все» считается по сделкам,
 -- иначе рейс вошёл бы в него два раза и сдвинул перцентили.

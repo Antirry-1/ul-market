@@ -1,5 +1,5 @@
 -- Контрольные хэши таблиц: число строк и md5 по отсортированным md5 строк.
--- Служебные поля времени и номера батча исключены: они меняются при каждом запуске.
+-- Служебные поля времени, номера батча и версии модели исключены: они меняются при каждом запуске.
 -- docker compose exec -T postgres psql -U postgres -d dwh -qAtX -v ON_ERROR_STOP=1 < sql/queries/table_hashes.sql
 
 select format(
@@ -12,7 +12,7 @@ from unnest(array['raw.prices', 'raw.price_dates', 'raw.price_body_types', 'core
 join information_schema.columns c
   on c.table_schema = split_part(t, '.', 1)
  and c.table_name = split_part(t, '.', 2)
- and c.column_name not in ('_batch_id', '_loaded_at', 'scored_at', 'quarantined_at')
+ and c.column_name not in ('_batch_id', '_loaded_at', 'scored_at', 'quarantined_at', 'model_release')
 group by t, n
 order by n
 \gexec

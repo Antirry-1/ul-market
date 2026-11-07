@@ -31,5 +31,6 @@ def setup_logging() -> None:
     root.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
 
 
-def log_event(logger: logging.Logger, event: str, **fields: object) -> None:
-    logger.info(event, extra={"fields": fields})
+def log_event(logger: logging.Logger, event: str, *, level: int = logging.INFO, **fields: object) -> None:
+    """Событие с полями. Нарушения и сбои пишутся уровнем WARNING или ERROR, чтобы их можно было отобрать по level."""
+    logger.log(level, event, extra={"fields": fields})

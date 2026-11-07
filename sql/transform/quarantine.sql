@@ -1,6 +1,9 @@
 -- Для RUB курс не нужен: пустая nearest_rate_date у рублёвой сделки не является ошибкой.
 -- RUB_PRICE_TOO_LOW только для положительных цен, иначе цена 0 получила бы два кода.
--- Верхние границы держат значения в разрядности витрины: иначе одна сделка уронит всю сборку.
+-- Границы PRICE_RUB_OUT_OF_RANGE держат значения в разрядности витрины: иначе одна сделка уронит всю сборку.
+-- Ставка меньше копейки за км округлилась бы в витрине до нуля, а изменение медианы к такой
+-- ставке не уместилось бы в колонку процентов. С границами рубль за рейс лежит в [1, 1e9),
+-- рубль за км в [0.01, 1e9), и под эти диапазоны рассчитаны типы колонок в 040_mart.sql.
 insert into dq.dq_quarantine_prices (price_id, reason_code, loading_date, raw_row, _batch_id)
 select
     p.id,
@@ -34,6 +37,10 @@ cross join lateral (values
     ('PRICE_RUB_OUT_OF_RANGE',   core.is_finite(converted.price_rub) and core.is_finite(p.distance) and (
                                      converted.price_rub >= 1e9
                                      or converted.price_rub / nullif(p.distance, 0) >= 1e9
+                                     -- Рублёвая цена до 1000 уже отбракована RUB_PRICE_TOO_LOW.
+                                     or (converted.price_rub > 0 and p.distance > 0
+                                         and converted.price_rub / p.distance < 0.01
+                                         and not (p.currency_code = '643' and p.price <= 1000))
                                      or (p.currency_code <> '643'
                                          and converted.price_rub > 0 and converted.price_rub < 1)))
 ) as rule (reason_code, failed)

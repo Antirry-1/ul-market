@@ -91,6 +91,57 @@ create table if not exists core.fact_price_date (
 );
 create index if not exists fact_price_date_price_date_idx on core.fact_price_date (price_date);
 
+-- Рыночная выборка для витрин: ровно одна строка на сделку, месяц и группу кузова.
+-- Отбор записан один раз для карточки маршрута и сводки рынка. Аудиты витрин считают его
+-- заново и сами, чтобы проверка не зависела от того, что проверяет.
+-- Дедупликация именно здесь: DISTINCT в агрегатах не исправил бы avg, stddev и перцентили.
+-- Будущие даты отсекаются построчно: у исторической сделки могут быть плановые месяцы.
+-- Функция, а не представление: last_date считается уже после отсечения дат позже as_of.
+create or replace function core.market_deal_months(as_of date)
+returns table (
+    price_id            bigint,
+    month               date,
+    last_date           date,
+    loading_city_gcid   integer,
+    unloading_city_gcid integer,
+    body_group          text,
+    weight_category     varchar(4),
+    distance            double precision,
+    price_rub           numeric,
+    price_km            double precision,
+    organization_id     integer,
+    price_type          smallint
+)
+language sql
+stable
+as $$
+    select
+        f.price_id,
+        date_trunc('month', d.price_date)::date,
+        max(d.price_date),
+        f.loading_city_gcid,
+        f.unloading_city_gcid,
+        b.body_group,
+        f.weight_category,
+        f.distance,
+        f.price_rub,
+        f.price_rub::double precision / nullif(f.distance, 0),
+        f.organization_id,
+        f.price_type
+    from core.fact_price f
+    join core.fact_price_date d on d.price_id = f.price_id
+    join core.bridge_price_body_group b on b.price_id = f.price_id
+    where f.is_fact
+      and f.price_type in (1, 2, 3, 4, 5, 9)
+      and not f.complex
+      and not f.outlier_mark
+      and f.price > 0
+      and f.distance > 0
+      and f.price_rub > 0
+      and d.price_date <= market_deal_months.as_of
+    group by f.price_id, date_trunc('month', d.price_date), b.body_group
+$$;
+
 -- Уникального индекса у курсов нет, поэтому на дату берём одну строку: опубликованную последней.
 create or replace view core.v_fx_rate as
 select distinct on (num_code, setting_date)
@@ -99,6 +150,21 @@ select distinct on (num_code, setting_date)
     value
 from raw.exchange_rates
 order by num_code, setting_date, id desc;
+
+-- Название города для витрин и признаков модели, своё у каждого gc_id. Одноимённые города
+-- из разных регионов иначе склеились бы в одно направление сводки и в одну категорию модели,
+-- а аудит сводки остановил бы сборку витрины. Регион дописывается только к повторяющемуся
+-- названию, gc_id только если совпал и регион. Неповторяющееся название остаётся как есть.
+create or replace view core.v_city_label as
+select
+    gc_id,
+    case
+        when count(*) over (partition by city_name) = 1 then city_name
+        when region is not null and count(*) over (partition by city_name, region) = 1
+            then city_name || ' (' || region || ')'
+        else city_name || coalesce(' (' || region || ')', '') || ' #' || gc_id
+    end as city_label
+from core.dim_city;
 
 -- Единственная точка доступа модели к данным. price_rub здесь только как целевая переменная,
 -- outlier_mark только для отбора строк: список признаков задан в ml/features.py.
@@ -115,8 +181,8 @@ select
     f.total_volume,
     o.region    as origin_region,
     d.region    as destination_region,
-    o.city_name as origin_city,
-    d.city_name as destination_city,
+    ol.city_label as origin_city,
+    dl.city_label as destination_city,
     o.latitude  as origin_lat,
     o.longitude as origin_lon,
     d.latitude  as destination_lat,
@@ -129,6 +195,8 @@ select
 from core.fact_price f
 join core.dim_city o on o.gc_id = f.loading_city_gcid
 join core.dim_city d on d.gc_id = f.unloading_city_gcid
+join core.v_city_label ol on ol.gc_id = f.loading_city_gcid
+join core.v_city_label dl on dl.gc_id = f.unloading_city_gcid
 where f.is_fact
   and f.price_type in (1, 2, 3, 4, 5, 9)
   and not f.complex

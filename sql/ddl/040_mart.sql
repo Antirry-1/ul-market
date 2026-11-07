@@ -1,3 +1,7 @@
+-- Разрядность процентов изменения следует из границ карантина (transform/quarantine.sql).
+-- Медиана за рейс лежит в [1, 1e9), поэтому mom_pct и yoy_pct меньше 1e11 и входят в numeric(14, 2).
+-- Медиана за км лежит в [0.01, 1e9), поэтому mom_km_pct и ytd_km_pct меньше 1e13 и входят в numeric(16, 2).
+
 -- Первичный ключ начинается с маршрута: карточка читает историю одной ячейки по месяцам.
 create table if not exists mart.mart_route_card (
     month               date not null,
@@ -17,8 +21,8 @@ create table if not exists mart.mart_route_card (
     trips_count         integer not null,
     carriers_count      integer not null,
     cv_rate             numeric(12, 6),
-    mom_pct             numeric(12, 2),
-    yoy_pct             numeric(12, 2),
+    mom_pct             numeric(14, 2),
+    yoy_pct             numeric(14, 2),
     reliability_level   text not null check (reliability_level in ('HIGH', 'MEDIUM', 'LOW_DATA')),
     last_trip_date      date not null,
     freshness_days      integer not null,
@@ -43,8 +47,8 @@ create table if not exists mart.mart_market_summary (
     median_trip      numeric(14, 2) not null,
     median_distance  numeric(10, 1) not null,
     trips_count      integer not null,
-    mom_km_pct       numeric(12, 2),
-    ytd_km_pct       numeric(12, 2),
+    mom_km_pct       numeric(16, 2),
+    ytd_km_pct       numeric(16, 2),
     trend_km         text not null,
     is_partial_month boolean not null,
     as_of            date not null,
@@ -81,9 +85,17 @@ create table if not exists mart.ml_price_predictions (
     split               text not null check (split in ('test', 'future')),
     outlier_mark        boolean not null,
     scored_at           timestamptz not null default now(),
+    -- Версия файлов модели (каталог release-* в MODEL_DIR), которая дала прогноз.
+    model_release       text not null,
+    -- Последняя дата погрузки в обучающих данных модели. У test это день перед test_start:
+    -- модель для метрик тестовый период не видела. У future это as_of: будущие заявки
+    -- оценивает модель, обученная на всей истории до даты снимка.
+    trained_through     date not null,
     primary key (price_id, model_name),
     check (split <> 'future'
-           or (actual_price_rub is null and abs_error_rub is null and ape_pct is null))
+           or (actual_price_rub is null and abs_error_rub is null and ape_pct is null)),
+    -- Прогноз дала модель, которая эту сделку не видела.
+    check (trained_through < loading_date)
 );
 create index if not exists ml_price_predictions_loading_date_idx
     on mart.ml_price_predictions (loading_date);
@@ -99,5 +111,7 @@ create table if not exists mart.ml_model_metrics (
     mae_rub    double precision,
     mdape_pct  double precision,
     wape_pct   double precision,
+    -- Ключи не включают версию: в таблицах лежит результат последней версии, а не история.
+    model_release text not null,
     primary key (model_name, split, slice)
 );

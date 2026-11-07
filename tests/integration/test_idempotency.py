@@ -106,6 +106,19 @@ def test_deal_moved_out_of_reloaded_window_is_reported(source, query, settings):
     assert query("select price_id from core.fact_price") == [(deal_id,)]
 
 
+def test_reload_rewrites_only_changed_reference_rows(source, load, query):
+    source.add_deal()
+    load()
+    first = dict(query("select id, _batch_id from raw.cities"))
+    source.execute("update cities set latitude = 56.9 where id = 5")
+
+    load()
+
+    second = dict(query("select id, _batch_id from raw.cities"))
+    assert {city for city in first if first[city] != second[city]} == {5}
+    assert query("select latitude from core.dim_city where gc_id = 1004") == [(56.9,)]
+
+
 def test_fixed_deal_leaves_quarantine(source, load, query):
     deal_id = source.add_deal(price=0.0)
     load()

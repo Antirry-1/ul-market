@@ -1,19 +1,23 @@
 -- Проверки сводки рынка до публикации: ноль строк значит проверка пройдена.
+-- Запрос возвращает ключ среза: первые строки попадают в лог как образец нарушений.
 
 -- @audit summary_not_empty error
 select 1
 where not exists (select 1 from stg_market_summary);
 
 -- @audit summary_corridor_is_ordered error
-select 1
+select month, route, body_group, weight_category, distance_band
 from stg_market_summary
 where not (p25_km <= median_km and median_km <= p75_km)
    or p25_km <= 0
    or trips_count < 1;
 
 -- Срез по направлению, кузову и весу обязан совпасть с ячейкой карточки маршрута, в обе стороны.
+-- Соединение по тексту направления точное: city_labels_are_unique в mart/audits.sql.
 -- @audit summary_matches_route_card error
-select 1
+select coalesce(s.month, c.month) as month, coalesce(s.route, c.route) as route,
+       coalesce(s.body_group, c.body_group) as body_group,
+       coalesce(s.weight_category, c.weight_category) as weight_category
 from (
     select *
     from stg_market_summary
@@ -34,7 +38,7 @@ where s.month is null
 
 -- Независимый пересчёт: в срезе «Все» рейс считается один раз, даже если у сделки две группы кузова.
 -- @audit summary_counts_each_deal_once error
-select 1
+select summary.trips as summary_trips, core_side.trips as core_trips
 from (
     select sum(trips_count) as trips
     from stg_market_summary
@@ -58,7 +62,7 @@ cross join (
 where summary.trips <> core_side.trips;
 
 -- @audit summary_mom_requires_previous_month error
-select 1
+select c.month, c.route, c.body_group, c.weight_category, c.distance_band
 from stg_market_summary c
 where c.mom_km_pct is not null
   and not exists (

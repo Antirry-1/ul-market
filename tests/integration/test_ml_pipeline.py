@@ -12,7 +12,7 @@ from ml.ablation import LEAK_DEMO_MODEL, NO_PRICE_TYPE_MODEL, run_ablation
 from ml.boosting import BoostingParams
 from ml.score import score
 from ml.split import SplitBounds
-from ml.storage import MAIN_MODEL
+from ml.storage import CURRENT_LINK, FORECAST_CATBOOST_FILE, MAIN_MODEL, SplitMismatch, current_release
 from ml.train import train
 
 PREDICTIONS_HASH = """
@@ -124,28 +124,174 @@ def test_repeat_gives_same_predictions(trained, query, settings):
     assert query(PREDICTIONS_HASH) == before
 
 
-def test_training_reads_only_rows_before_test_period(deals, load, settings, fast_candidates, monkeypatch):
+RELEASES = """
+    select 'predictions', model_release from mart.ml_price_predictions
+    union
+    select 'metrics', model_release from mart.ml_model_metrics
+    order by 1, 2
+"""
+
+
+def test_predictions_and_metrics_share_model_release(trained, query, settings):
+    release = current_release(settings.model_dir).name
+    assert release.startswith("release-")
+    assert query(RELEASES) == [("metrics", release), ("predictions", release)]
+
+    # Через журнал запусков версия ведёт к шагу обучения, который её создал.
+    ((train_run_id, train_release),) = query(
+        "select run_id, details->>'model_release' from ops.pipeline_runs where step = 'ml-train'"
+    )
+    ((score_release, score_train_run_id),) = query(
+        "select details->>'model_release', (details->>'train_run_id')::bigint "
+        "from ops.pipeline_runs where step = 'ml-score'"
+    )
+    assert train_release == score_release == release
+    assert score_train_run_id == train_run_id
+
+
+def test_retraining_changes_model_release(trained, query, settings):
+    before = current_release(settings.model_dir).name
+    train(settings)
+    after = current_release(settings.model_dir).name
+    assert after != before
+    # Метрики val пишет обучение, поэтому они уже новые, а прогнозы и test остаются от прежней версии до скоринга.
+    assert query("select distinct model_release from mart.ml_model_metrics where split = 'val'") == [(after,)]
+    assert query("select distinct model_release from mart.ml_price_predictions") == [(before,)]
+
+    score(settings)
+    assert query(RELEASES) == [("metrics", after), ("predictions", after)]
+
+
+def test_training_reads_test_period_only_after_evaluated_model(deals, load, settings, fast_candidates,
+                                                              monkeypatch):
     load()
     seen = []
     original = ml.train.read_features
+    original_fit = ml.train.fit_main_model
 
     def spy(conn, start, end=None):
         frame = original(conn, start, end)
-        seen.append(frame)
+        seen.append(("read", frame))
         return frame
 
+    def fit_spy(frame, *args):
+        seen.append(("fit", frame))
+        return original_fit(frame, *args)
+
     monkeypatch.setattr(ml.train, "read_features", spy)
+    monkeypatch.setattr(ml.train, "fit_main_model", fit_spy)
     train(settings)
 
     bounds = SplitBounds.from_as_of(settings.as_of)
-    assert seen[0]["loading_date"].max() < bounds.test_start
-    assert seen[0]["loading_date"].min() >= bounds.train_start
+    steps = [step for step, _ in seen]
+    assert steps == ["read", "fit", "read", "fit"]
+    (_, before_test), (_, evaluated), (_, recent), (_, history) = seen
+    # Модель для метрик обучена раньше, чем прочитан тестовый период.
+    assert before_test["loading_date"].min() >= bounds.train_start
+    assert evaluated["loading_date"].max() < bounds.test_start
+    # Модель для будущих заявок видит всю историю до as_of включительно, но не дальше.
+    assert recent["loading_date"].min() >= bounds.test_start
+    assert history["loading_date"].max() == bounds.as_of
+    assert not history["outlier_mark"].any()
+
+
+def predictions_by_split(query, split):
+    return query(
+        "select price_id, predicted_price_rub from mart.ml_price_predictions where split = %s order by 1",
+        (split,),
+    )
+
+
+def test_test_prices_reach_only_forecast_model(trained, query, settings):
+    test_before = predictions_by_split(query, "test")
+    future_before = predictions_by_split(query, "future")
+    query("update core.fact_price set price_rub = price_rub * 3 "
+          "where loading_date between '2026-10-05' and '2026-10-26' returning 1")
+    train(settings)
+    score(settings)
+    # Цены test не влияют на прогноз test: модель для метрик их не видит.
+    assert predictions_by_split(query, "test") == test_before
+    # Модель для будущих заявок на них учится.
+    assert predictions_by_split(query, "future") != future_before
+
+
+def test_trained_through_names_the_model_of_each_split(trained, query):
+    assert query(
+        "select split, min(trained_through), max(trained_through) from mart.ml_price_predictions "
+        "group by 1 order by 1"
+    ) == [("future", date(2026, 10, 26), date(2026, 10, 26)), ("test", date(2026, 10, 4), date(2026, 10, 4))]
+
+
+def test_score_refuses_release_without_forecast_model(trained, settings):
+    (current_release(settings.model_dir) / FORECAST_CATBOOST_FILE).unlink()
+    with pytest.raises(FileNotFoundError, match=f"{FORECAST_CATBOOST_FILE}.*ml.train"):
+        score(settings)
 
 
 def test_fact_vs_forecast_view_keeps_prediction_grain(trained, query):
     assert query("select count(*) from mart.v_fact_vs_forecast") == query(
         "select count(*) from mart.ml_price_predictions"
     )
+
+
+def test_test_rows_compare_with_corridor_of_loading_month(trained, query):
+    ((with_corridor, other_month),) = query(
+        """
+        select count(corridor_month),
+               count(*) filter (where corridor_month <> date_trunc('month', loading_date)::date)
+        from mart.v_fact_vs_forecast
+        where split = 'test'
+        """
+    )
+    assert with_corridor > 0
+    assert other_month == 0
+
+
+def test_future_rows_get_corridor_of_latest_month_of_cell(trained, query):
+    rows = query(
+        """
+        select v.corridor_month, v.median_trip, c.median_trip
+        from mart.v_fact_vs_forecast v
+        join core.fact_price f using (price_id)
+        left join mart.mart_route_card c
+               on c.loading_city_gcid = f.loading_city_gcid
+              and c.unloading_city_gcid = f.unloading_city_gcid
+              and c.body_group = v.body_group
+              and c.weight_category = v.weight_category
+              and c.month = v.corridor_month
+        where v.split = 'future' and v.loading_date >= '2026-11-01'
+        """
+    )
+    assert rows
+    # В витрине нет месяцев позже октября, поэтому коридор берётся из него.
+    assert all(month == date(2026, 10, 1) and view == mart for month, view, mart in rows)
+
+
+def test_failed_metrics_write_keeps_previous_release(deals, load, settings, fast_candidates,
+                                                     query, monkeypatch):
+    load()
+    train(settings)
+    previous = current_release(settings.model_dir)
+    val_versions = "select model_name, xmin::text from mart.ml_model_metrics where split = 'val' order by 1"
+    metrics_before = query(val_versions)
+
+    original = ml.train.storage.write_metrics
+    calls = []
+
+    def fail_on_second_model(conn, *args, **kwargs):
+        calls.append(args[0])
+        if len(calls) == 2:
+            raise RuntimeError("запись метрик упала")
+        original(conn, *args, **kwargs)
+
+    monkeypatch.setattr(ml.train.storage, "write_metrics", fail_on_second_model)
+    with pytest.raises(RuntimeError, match="запись метрик упала"):
+        train(settings)
+
+    assert current_release(settings.model_dir) == previous
+    assert [path for path in settings.model_dir.iterdir() if path.name != CURRENT_LINK] == [previous]
+    # Метрики первой модели успели записаться, но откатились вместе с транзакцией.
+    assert query(val_versions) == metrics_before
 
 
 @pytest.fixture
@@ -171,6 +317,10 @@ def test_ablation_writes_metrics_but_not_predictions(level_model, query, setting
         (NO_PRICE_TYPE_MODEL, LEAK_DEMO_MODEL),
     ) == sorted([(NO_PRICE_TYPE_MODEL, True), (LEAK_DEMO_MODEL, True)])
     assert query("select distinct model_name from mart.ml_price_predictions") == [(MAIN_MODEL,)]
+    assert query(
+        "select distinct model_release from mart.ml_model_metrics where model_name in (%s, %s)",
+        (NO_PRICE_TYPE_MODEL, LEAK_DEMO_MODEL),
+    ) == [(current_release(settings.model_dir).name,)]
 
 
 def test_ablation_level_model_does_not_see_price_type(level_model, settings, monkeypatch):
@@ -192,3 +342,16 @@ def test_score_without_trained_model_is_clear(deals, load, settings):
     empty = replace(settings, model_dir=settings.model_dir / "empty")
     with pytest.raises(FileNotFoundError, match="ml.train"):
         score(empty)
+
+
+def test_score_refuses_model_trained_on_other_split(trained, query, settings):
+    # С более ранним AS_OF test лёг бы на строки train, и метрики вышли бы завышенными.
+    before = query(PREDICTIONS_HASH)
+    earlier = replace(settings, as_of=date(2026, 10, 12))
+    with pytest.raises(SplitMismatch, match="Переобучите"):
+        score(earlier)
+    with pytest.raises(SplitMismatch):
+        run_ablation(earlier)
+    assert query(PREDICTIONS_HASH) == before
+    assert query("select status, details->>'error' like '%%Переобучите%%' from ops.pipeline_runs "
+                 "where step = 'ml-score' order by run_id desc limit 1") == [("failed", True)]

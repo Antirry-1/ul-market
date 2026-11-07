@@ -1,6 +1,7 @@
 -- gc_id в источнике не уникален: остаётся запись с минимальным id.
 -- Строки измерений не удаляются, на них ссылаются сделки из других окон.
-insert into core.dim_city (gc_id, source_id, city_name, region, latitude, longitude)
+-- Неизменённая строка не переписывается, как и в raw_references.sql.
+insert into core.dim_city as c (gc_id, source_id, city_name, region, latitude, longitude)
 select distinct on (gc_id)
     gc_id,
     id,
@@ -18,9 +19,12 @@ on conflict (gc_id) do update set
     city_name = excluded.city_name,
     region    = excluded.region,
     latitude  = excluded.latitude,
-    longitude = excluded.longitude;
+    longitude = excluded.longitude
+where (c.source_id, c.city_name, c.region, c.latitude, c.longitude)
+      is distinct from
+      (excluded.source_id, excluded.city_name, excluded.region, excluded.latitude, excluded.longitude);
 
-insert into core.dim_body_type (body_type_id, name, std_id, body_group)
+insert into core.dim_body_type as b (body_type_id, name, std_id, body_group)
 select
     id,
     name,
@@ -36,4 +40,6 @@ from raw.body_types
 on conflict (body_type_id) do update set
     name       = excluded.name,
     std_id     = excluded.std_id,
-    body_group = excluded.body_group;
+    body_group = excluded.body_group
+where (b.name, b.std_id, b.body_group)
+      is distinct from (excluded.name, excluded.std_id, excluded.body_group);

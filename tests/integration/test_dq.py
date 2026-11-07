@@ -2,7 +2,10 @@
 
 from datetime import date, datetime
 
+import psycopg
 import pytest
+
+from etl.init_dwh import init_dwh
 
 
 def reasons(query, deal_id: int) -> set[str]:
@@ -42,6 +45,7 @@ def in_fact(query, deal_id: int) -> bool:
         ({"price": 1e17}, {"PRICE_RUB_OUT_OF_RANGE"}),
         ({"price": 5000.0, "distance": 1e-6}, {"PRICE_RUB_OUT_OF_RANGE"}),
         ({"price": 0.001, "currency_code": "840"}, {"PRICE_RUB_OUT_OF_RANGE"}),
+        ({"price": 5000.0, "distance": 600_000.0}, {"PRICE_RUB_OUT_OF_RANGE"}),
     ],
 )
 def test_invalid_deal_goes_to_quarantine_with_reason(source, load, query, overrides, expected):
@@ -60,6 +64,7 @@ def test_invalid_deal_goes_to_quarantine_with_reason(source, load, query, overri
         {"unloading_city_gcid": 1001},
         {"nearest_rate_date": None},
         {"currency_code": "840", "price": 500.0},
+        {"price": 5000.0, "distance": 400_000.0},
     ],
 )
 def test_valid_deal_stays_in_core(source, load, query, overrides):
@@ -162,3 +167,34 @@ def test_source_category_is_kept(source, load, query):
     assert query("select weight_category from core.fact_price where price_id = %s", (deal_id,)) == [("10T",)]
     ((audits,),) = query("select details -> 'audits' from ops.pipeline_runs")
     assert audits["source_category_differs_from_rule"] == 1
+
+
+REASON_CHECK = """
+    select c.oid, pg_get_constraintdef(c.oid)
+    from pg_constraint c
+    where c.conrelid = 'dq.dq_quarantine_prices'::regclass
+      and c.conname = 'dq_quarantine_prices_reason_code_check'
+"""
+
+
+def test_reason_check_is_not_rebuilt_on_repeated_init(settings, query):
+    # init-dwh идёт перед каждым запуском DAG: без изменений таблицу карантина он не блокирует.
+    before = query(REASON_CHECK)
+    init_dwh(settings.dwh_dsn)
+    assert query(REASON_CHECK) == before
+    assert "PRICE_RUB_OUT_OF_RANGE" in before[0][1]
+
+
+def test_reason_check_gets_new_codes(settings, query):
+    ((oid, full_definition),) = query(REASON_CHECK)
+    with psycopg.connect(settings.dwh_dsn) as conn:
+        conn.execute("alter table dq.dq_quarantine_prices drop constraint dq_quarantine_prices_reason_code_check")
+        conn.execute("alter table dq.dq_quarantine_prices add constraint dq_quarantine_prices_reason_code_check "
+                     "check (reason_code in ('PRICE_NON_POSITIVE'))")
+    init_dwh(settings.dwh_dsn)
+    ((new_oid, definition),) = query(REASON_CHECK)
+    assert new_oid != oid
+    assert definition == full_definition
+    with pytest.raises(psycopg.errors.CheckViolation), psycopg.connect(settings.dwh_dsn) as conn:
+        conn.execute("insert into dq.dq_quarantine_prices (price_id, reason_code, loading_date, raw_row, _batch_id) "
+                     "values (1, 'UNKNOWN', date '2026-09-01', '{}', 1)")

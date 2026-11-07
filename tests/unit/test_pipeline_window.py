@@ -1,5 +1,6 @@
+import re
 import sys
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -12,8 +13,30 @@ START = datetime(2026, 10, 25, tzinfo=timezone.utc)
 END = datetime(2026, 10, 26, tzinfo=timezone.utc)
 
 
-def test_scheduled_run_uses_data_interval():
-    assert load_arguments({}, START, END) == "--start-date 2026-10-25 --end-date 2026-10-26"
+def test_scheduled_run_extends_data_interval():
+    assert load_arguments({}, START, END) == "--start-date 2026-09-20 --end-date 2027-02-23"
+
+
+def scheduled_window(start: datetime, end: datetime) -> tuple[date, date]:
+    match = re.fullmatch(r"--start-date (\d{4}-\d{2}-\d{2}) --end-date (\d{4}-\d{2}-\d{2})",
+                         load_arguments({}, start, end))
+    assert match, "в bash уходят только даты"
+    return date.fromisoformat(match[1]), date.fromisoformat(match[2])
+
+
+@pytest.mark.parametrize("loading_date", [
+    date(2027, 2, 13),                         # самая дальняя заявка в источнике: as_of + 110 дней
+    date(2026, 10, 25),                        # погрузка в день интервала
+    date(2026, 10, 25) - timedelta(days=30),   # сделка, ещё влияющая на свежесть витрины
+])
+def test_scheduled_window_covers_requests_created_in_interval(loading_date):
+    start, end = scheduled_window(START, END)
+    assert start <= loading_date < end
+
+
+def test_scheduled_window_follows_interval_not_as_of():
+    start = datetime(2026, 11, 7, tzinfo=timezone.utc)
+    assert scheduled_window(start, start + timedelta(days=1)) == (date(2026, 10, 3), date(2027, 3, 8))
 
 
 def test_conf_window_overrides_data_interval():

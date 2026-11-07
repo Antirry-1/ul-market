@@ -1,0 +1,30 @@
+# Тесты на настоящем PostgreSQL 17: тот же compose, что и у локального запуска.
+# Источник маленький, интеграционным тестам он нужен только ради ролей и баз.
+# REQUIRE_DB=1 из .env.example не даёт интеграционным тестам тихо пропуститься.
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      COMPOSE_PROJECT_NAME: ul-market-ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Сборка образа
+        run: docker compose build pipeline
+
+      - name: PostgreSQL, роли и источник
+        run: docker compose run --rm -e N_PRICES=2000 source-seed
+
+      - name: pytest
+        run: docker compose run --rm --no-deps pipeline pytest
+
+      - name: Остановка
+        if: always()
+        run: docker compose down -v

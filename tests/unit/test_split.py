@@ -17,6 +17,12 @@ def test_bounds_follow_from_as_of():
     assert BOUNDS.test_start == date(2026, 10, 5)
 
 
+def test_model_data_ends_follow_from_split():
+    # Модель для метрик учится до дня перед test, модель будущих заявок до as_of включительно.
+    assert BOUNDS.train_through == date(2026, 10, 4)
+    assert BOUNDS.history_end == date(2026, 10, 27)
+
+
 def test_edges_of_each_split():
     assert pd.isna(label("2026-07-25"))
     assert label("2026-07-26") == "train"

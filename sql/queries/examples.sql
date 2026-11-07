@@ -65,6 +65,16 @@ where split = 'test'
 order by deviation_pct desc
 limit 10;
 
+\echo 'Прогноз заявок на декабрь рядом с последним коридором ячейки'
+select price_id, loading_date, loading_city, unloading_city, body_group, weight_category,
+       predicted_price_rub, corridor_month, p25_trip, median_trip, p75_trip, reliability_level
+from mart.v_fact_vs_forecast
+where split = 'future'
+  and loading_date >= '2026-12-01'
+  and reliability_level in ('HIGH', 'MEDIUM')
+order by loading_date, price_id
+limit 10;
+
 \echo 'Последние запуски'
 select run_id, step, window_start, window_end, status, rows_read, rows_loaded, rows_quarantined,
        finished_at - started_at as duration

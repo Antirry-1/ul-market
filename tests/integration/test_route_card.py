@@ -47,6 +47,22 @@ def test_metrics_match_pandas(source, build, query):
     assert float(cv) == pytest.approx(series.std(ddof=1) / series.mean(), abs=1e-6)
 
 
+def test_extreme_month_change_fits_mart(source, build, query):
+    # Самые крайние медианы, которые пропускает карантин: 1,80 руб. за рейс (0,02 доллара)
+    # и 9e8 руб. Изменение около 5e10 % не уместилось бы в прежнюю колонку numeric(12, 2).
+    source.add_deal(loading_date=date(2026, 8, 15), currency_code="840", price=0.02, distance=100.0)
+    source.add_deal(loading_date=date(2026, 9, 15), price=9e8, distance=100.0)
+    build()
+    ((mom,),) = query("select mom_pct from mart.mart_route_card where month = '2026-09-01'")
+    assert float(mom) == pytest.approx(100 * (9e8 / 1.8 - 1), rel=1e-9)
+    ((mom_km,),) = query("""
+        select mom_km_pct from mart.mart_market_summary
+        where month = '2026-09-01' and route <> 'Все' and body_group = 'Тент'
+          and weight_category = 'FTL' and distance_band = 'до 300 км'
+    """)
+    assert float(mom_km) == pytest.approx(100 * (9e6 / 0.018 - 1), rel=1e-9)
+
+
 def test_cv_is_null_for_single_trip(source, build, query):
     source.add_deal()
     build()

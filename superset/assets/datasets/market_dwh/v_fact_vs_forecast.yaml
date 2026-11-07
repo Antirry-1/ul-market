@@ -278,5 +278,29 @@ columns:
   description: null
   python_date_format: null
   extra: null
+- column_name: corridor_month
+  verbose_name: Месяц коридора
+  is_dttm: false
+  is_active: true
+  type: DATE
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: null
+  description: null
+  python_date_format: null
+  extra: null
+- column_name: trained_through
+  verbose_name: Модель обучена по
+  is_dttm: false
+  is_active: true
+  type: DATE
+  advanced_data_type: null
+  groupby: true
+  filterable: true
+  expression: null
+  description: null
+  python_date_format: null
+  extra: null
 version: 1.0.0
 database_uuid: b8ce183b-187e-5482-8b4e-20c207a8cd89

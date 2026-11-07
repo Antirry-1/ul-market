@@ -6,15 +6,14 @@
 
 from __future__ import annotations
 
-import json
 import logging
 
 import pandas as pd
 
 from etl.config import Settings
-from etl.db import connect, pipeline_lock
+from etl.db import connect
 from etl.log import log_event, setup_logging
-from etl.runs import tracked_run
+from etl.runs import locked_run
 from ml import storage
 from ml.baseline import LogRidge
 from ml.boosting import BoostingParams, fit_boosting, predict_boosting
@@ -37,9 +36,10 @@ def add_leak(frame: pd.DataFrame) -> pd.DataFrame:
 def run_ablation(settings: Settings) -> None:
     bounds = SplitBounds.from_as_of(settings.as_of)
 
-    with pipeline_lock(settings.dwh_dsn), tracked_run(settings.dwh_dsn, "ml-ablation") as run:
+    with locked_run(settings.dwh_dsn, "ml-ablation") as run:
         release = storage.current_release(settings.model_dir)
-        meta = json.loads((release / storage.META_FILE).read_text(encoding="utf-8"))
+        meta = storage.read_meta(release)
+        storage.check_split(meta, bounds)
         params = BoostingParams(**meta["params"])
         features = meta["features"]
 
@@ -69,8 +69,9 @@ def run_ablation(settings: Settings) -> None:
 
         with connect(settings.dwh_dsn) as conn:
             for name, metrics in results.items():
-                storage.write_metrics(conn, name, "test", metrics)
+                storage.write_metrics(conn, name, "test", metrics, model_release=meta["release"])
         run.rows_read = len(frame)
+        run.details["model_release"] = meta["release"]
 
 
 def main() -> None:

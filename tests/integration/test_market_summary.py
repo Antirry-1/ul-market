@@ -84,3 +84,31 @@ def test_trend_rises_with_prices(source, build, query):
 
 def test_constant_series_has_flat_trend(query):
     assert query("select mart.sparkline(array[5, 5, 5]::numeric[])") == [("▄▄▄",)]
+
+
+def add_city(source, city_id: int, gc_id: int, full_name: str) -> None:
+    source.execute(
+        "insert into cities (id, full_name_local, full_name_gc, gc_id, name, latitude, longitude) "
+        "values (%s, %s, %s, %s, %s, 55.0, 50.0)",
+        (city_id, full_name, full_name, gc_id, full_name.split(",")[0]),
+    )
+
+
+def test_same_named_cities_stay_separate_routes(source, build, query):
+    # Одинаковое название в разных регионах: два направления, а не одно общее.
+    add_city(source, 101, 2001, "Октябрьский, Республика Башкортостан")
+    add_city(source, 102, 2002, "Октябрьский, Волгоградская обл.")
+    source.add_deal(unloading_city_gcid=2001, price=100000.0)
+    source.add_deal(unloading_city_gcid=2002, price=300000.0)
+    build()
+    assert query("select unloading_city_gcid, unloading_city, median_trip from mart.mart_route_card "
+                 "order by 1") == [
+        (2001, "Октябрьский (Республика Башкортостан)", Decimal("100000.00")),
+        (2002, "Октябрьский (Волгоградская обл.)", Decimal("300000.00")),
+    ]
+    assert query("select route, median_trip from mart.mart_market_summary "
+                 "where route <> 'Все' and body_group = 'Все' and weight_category = 'Все' "
+                 "and distance_band = 'Все' order by 1") == [
+        ("Москва → Октябрьский (Волгоградская обл.)", Decimal("300000.00")),
+        ("Москва → Октябрьский (Республика Башкортостан)", Decimal("100000.00")),
+    ]

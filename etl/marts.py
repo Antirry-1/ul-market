@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from etl.audits import run_audits
 from etl.config import Settings
-from etl.db import connect, pipeline_lock, run_sql_file, set_params
-from etl.runs import tracked_run
+from etl.db import connect, run_sql_file, set_params
+from etl.runs import locked_run
 
 
 def build_marts(settings: Settings) -> None:
-    with pipeline_lock(settings.dwh_dsn), tracked_run(settings.dwh_dsn, "build-marts") as run:
+    with locked_run(settings.dwh_dsn, "build-marts") as run:
         with connect(settings.dwh_dsn) as conn:
             set_params(conn, as_of=settings.as_of)
             conn.execute("set local work_mem = '256MB'")

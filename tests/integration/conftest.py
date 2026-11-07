@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import replace
 from datetime import date, datetime
 
@@ -18,6 +19,10 @@ TEST_SOURCE_DB = "ul_test_source"
 TEST_DWH_DB = "ul_test_dwh"
 
 WHOLE_RANGE = (date(2020, 1, 1), date(2030, 1, 1))
+
+# Без базы интеграционные тесты пропускаются, и pytest остаётся зелёным на одних unit-тестах.
+# REQUIRE_DB=1 превращает пропуск в ошибку: так прогон в контейнере или CI не обманет.
+REQUIRE_DB_ENV = "REQUIRE_DB"
 
 BODY_TYPES = (
     (1, "бортовая", 15), (2, "изотермический", 2), (3, "контейнер", 3), (4, "рефрижератор", 4),
@@ -131,6 +136,8 @@ def settings(tmp_path_factory: pytest.TempPathFactory) -> Settings:
                 admin.execute(f"drop database if exists {name} with (force)")
                 admin.execute(f"create database {name}")
     except (RuntimeError, psycopg.OperationalError) as error:
+        if os.environ.get(REQUIRE_DB_ENV) == "1":
+            pytest.fail(f"PostgreSQL недоступен, а {REQUIRE_DB_ENV}=1: {error}", pytrace=False)
         pytest.skip(f"PostgreSQL недоступен: {error}")
 
     source_dsn = make_conninfo(**{**conninfo, "dbname": TEST_SOURCE_DB})

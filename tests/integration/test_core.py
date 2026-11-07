@@ -15,6 +15,35 @@ def test_city_duplicates_collapse_to_minimal_id(source, load, query):
     ]
 
 
+def test_city_label_is_unique_per_gc_id(source, load, query):
+    # Регион добавляется только к повторяющемуся названию, gc_id только если совпал и регион.
+    for city_id, gc_id, full_name in (
+        (101, 2001, "Октябрьский, Республика Башкортостан"),
+        (102, 2002, "Октябрьский, Волгоградская обл."),
+        (103, 2003, "Ленинск, Волгоградская обл."),
+        (104, 2004, "Ленинск, Волгоградская обл."),
+        (105, 2005, "Ленинск"),
+    ):
+        source.execute(
+            "insert into cities (id, full_name_local, full_name_gc, gc_id, name, latitude, longitude) "
+            "values (%s, %s, %s, %s, %s, 55.0, 50.0)",
+            (city_id, full_name, full_name, gc_id, full_name.split(",")[0]),
+        )
+    source.add_deal(unloading_city_gcid=2001)
+    load()
+    assert query("select gc_id, city_label from core.v_city_label where gc_id >= 2000 order by gc_id") == [
+        (2001, "Октябрьский (Республика Башкортостан)"),
+        (2002, "Октябрьский (Волгоградская обл.)"),
+        (2003, "Ленинск (Волгоградская обл.) #2003"),
+        (2004, "Ленинск (Волгоградская обл.) #2004"),
+        (2005, "Ленинск #2005"),
+    ]
+    assert query("select city_label from core.v_city_label where gc_id = 1001") == [("Москва",)]
+    assert query("select origin_city, destination_city from core.v_ml_features") == [
+        ("Москва", "Октябрьский (Республика Башкортостан)"),
+    ]
+
+
 def test_joins_keep_one_row_per_deal(source, load, query):
     for _ in range(5):
         source.add_deal(links=[56, 15], dates=[date(2026, 9, 15), date(2026, 10, 15)])
