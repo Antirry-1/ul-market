@@ -29,6 +29,8 @@ DEFAULT_SEEDS = 10
 
 def main() -> None:
     seeds = range(int(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_SEEDS)
+    if len(seeds) < 2:
+        raise SystemExit("Разброс считается минимум по двум seed")
     settings = Settings.from_env()
     bounds = SplitBounds.from_as_of(settings.as_of)
     features = list(FEATURES)

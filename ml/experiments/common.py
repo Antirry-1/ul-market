@@ -2,7 +2,8 @@
 
 Эксперименты ничего не пишут в хранилище и в каталог моделей, только печатают результат.
 Им нужна обученная версия модели (python -m ml.train), а bootstrap_vs_catboost_log ещё и прогнозы
-test в mart.ml_price_predictions (python -m ml.score).
+test в mart.ml_price_predictions (python -m ml.score). Запускать их одновременно с ml.train нельзя:
+новая версия удаляет прошлый каталог, и эксперимент, который ещё читает из него файлы, упадёт.
 """
 
 from __future__ import annotations
@@ -14,11 +15,13 @@ from ml import storage
 from ml.boosting import BoostingParams
 from ml.features import FEATURES
 from ml.metrics import regression_metrics
+from ml.split import SplitBounds
 
 
 def main_params(settings: Settings) -> BoostingParams:
     """Параметры основной модели из текущей версии, с подобранным числом итераций."""
     meta = storage.read_meta(storage.current_release(settings.model_dir))
+    storage.check_split(meta, SplitBounds.from_as_of(settings.as_of))
     storage.check_features(meta, FEATURES)
     return BoostingParams(**meta["params"])
 

@@ -40,6 +40,10 @@ def main() -> None:
     bounds = SplitBounds.from_as_of(settings.as_of)
     features = list(FEATURES)
     params = replace(main_params(settings), iterations=BoostingParams.iterations)
+    # Основная модель загружается сразу: обучение идёт минуты, а переобучение за это время удалило бы её файлы.
+    release = storage.current_release(settings.model_dir)
+    meta = storage.read_meta(release)
+    main_model = MainModel.load(release, storage.CATBOOST_FILE, storage.RIDGE_FILE)
     with connect(settings.dwh_dsn) as conn:
         history = with_trend(without_outliers(read_features(conn, HISTORY_START, bounds.test_start)))
         test = with_trend(without_outliers(read_features(conn, bounds.test_start, bounds.history_end)))
@@ -65,10 +69,8 @@ def main() -> None:
         print(f"  Ridge + CatBoost: {describe(actual, predict_boosting(booster, test, features, params.log_target, ridge))}")
         print(f"  только Ridge:     {describe(actual, ridge.predict(test))}")
 
-    release = storage.current_release(settings.model_dir)
-    meta = storage.read_meta(release)
-    main = MainModel.load(release, storage.CATBOOST_FILE, storage.RIDGE_FILE)
-    print(f"\nосновная модель:    {describe(test_clipped[TARGET].to_numpy(), main.predict(test_clipped, meta))}")
+    clipped_actual = test_clipped[TARGET].to_numpy()
+    print(f"\nосновная модель:    {describe(clipped_actual, main_model.predict(test_clipped, meta))}")
 
 
 if __name__ == "__main__":
