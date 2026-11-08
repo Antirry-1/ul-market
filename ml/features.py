@@ -25,8 +25,9 @@ CATEGORICAL_FEATURES = (
 
 FEATURES = NUMERIC_FEATURES + CATEGORICAL_FEATURES
 
-# Признаки линейной модели уровня цены. Календаря здесь нет: train покрывает июль-октябрь,
-# и линейный коэффициент при месяце уводит прогноз на январь на 30 % вниз.
+# Признаки линейной модели уровня цены. Календаря здесь нет: обучение покрывает июль-октябрь,
+# и Ridge продолжает календарь по прямой. С месяцем числом прогноз на январь уходит на 15 % вниз,
+# с гармониками на 6 % вверх, см. ml/experiments/ridge_calendar.py.
 LEVEL_NUMERIC_FEATURES = (
     "distance", "total_weight", "total_volume",
     "origin_lat", "origin_lon", "destination_lat", "destination_lon",

@@ -40,13 +40,17 @@ class LogRidge:
     Модель сравнивается с основной и задаёт для неё уровень цены.
     """
 
-    def __init__(self, categorical: tuple[str, ...] = CATEGORICAL_FEATURES) -> None:
+    def __init__(
+        self,
+        categorical: tuple[str, ...] = CATEGORICAL_FEATURES,
+        numeric_features: tuple[str, ...] = LEVEL_NUMERIC_FEATURES,
+    ) -> None:
         numeric = Pipeline([
             ("impute", SimpleImputer(strategy="median")),
             ("scale", StandardScaler()),
         ])
         columns = ColumnTransformer([
-            ("numeric", numeric, list(LEVEL_NUMERIC_FEATURES)),
+            ("numeric", numeric, list(numeric_features)),
             ("categorical", OneHotEncoder(handle_unknown="ignore"), list(categorical)),
         ])
         self.model_ = Pipeline([("columns", columns), ("model", Ridge(alpha=RIDGE_ALPHA))])

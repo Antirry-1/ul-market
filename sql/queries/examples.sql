@@ -7,7 +7,8 @@ select loading_city, unloading_city, body_group, weight_category,
 from mart.v_route_network
 where month = date '2026-09-01'
   and reliability_level in ('HIGH', 'MEDIUM')
-order by trips_count desc
+order by trips_count desc, loading_city collate "C", unloading_city collate "C",
+         body_group collate "C", weight_category collate "C"
 limit 10;
 
 \echo 'История коридора: Москва -> Ростов-на-Дону, Тент, FTL'
@@ -62,7 +63,7 @@ from mart.v_fact_vs_forecast
 where split = 'test'
   and is_above_forecast
   and not outlier_mark
-order by deviation_pct desc
+order by deviation_pct desc, price_id
 limit 10;
 
 \echo 'Прогноз заявок на декабрь рядом с последним коридором ячейки'

@@ -16,6 +16,7 @@ params:
   - trend_km
   order_by_cols:
   - '["trips_count", false]'
+  - '["route", true]'
   row_limit: 10
   adhoc_filters:
   - expressionType: SQL

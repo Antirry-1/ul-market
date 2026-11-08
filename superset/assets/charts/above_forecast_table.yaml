@@ -27,6 +27,7 @@ params:
   - is_above_corridor
   order_by_cols:
   - '["deviation_pct", false]'
+  - '["price_id", true]'
   row_limit: 200
   adhoc_filters:
   - expressionType: SQL

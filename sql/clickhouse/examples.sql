@@ -6,7 +6,7 @@ select loading_city, unloading_city, body_group, weight_category,
 from mart_route_card final
 where month = '2026-09-01'
   and reliability_level != 'LOW_DATA'
-order by trips_count desc
+order by trips_count desc, loading_city, unloading_city, body_group, weight_category
 limit 10;
 
 -- История коридора одной ячейки
