@@ -20,7 +20,7 @@ from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import BranchPythonOperator, ShortCircuitOperator
 from airflow.utils.trigger_rule import TriggerRule
-from pipeline_window import clickhouse_available, load_arguments, retrain_requested
+from pipeline_window import TASK_TIMEOUT, clickhouse_available, load_arguments, retrain_requested
 
 PYTHON = "/opt/pipeline-venv/bin/python"
 PIPELINE_DIR = "/opt/pipeline"
@@ -52,7 +52,7 @@ with DAG(
     catchup=False,
     max_active_runs=1,
     is_paused_upon_creation=False,
-    default_args={"retries": 1, "retry_delay": timedelta(minutes=1)},
+    default_args={"retries": 1, "retry_delay": timedelta(minutes=1), "execution_timeout": TASK_TIMEOUT},
     user_defined_macros={"load_arguments": load_arguments},
     tags=["market"],
 ) as dag:

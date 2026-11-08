@@ -25,7 +25,7 @@ from etl.runs import locked_run
 from ml import storage
 from ml.baseline import LogRidge
 from ml.boosting import predict_boosting
-from ml.features import TARGET, read_features
+from ml.features import FEATURES, TARGET, read_features
 from ml.metrics import sliced_metrics
 from ml.split import SplitBounds, assign_split
 
@@ -100,15 +100,20 @@ def score(settings: Settings) -> None:
         release = storage.current_release(settings.model_dir)
         meta = storage.read_meta(release)
         storage.check_split(meta, bounds)
+        storage.check_features(meta, FEATURES)
         storage.check_files(release)
         evaluated = MainModel.load(release, storage.CATBOOST_FILE, storage.RIDGE_FILE)
         forecast = MainModel.load(release, storage.FORECAST_CATBOOST_FILE, storage.FORECAST_RIDGE_FILE)
         baseline = joblib.load(release / storage.BASELINE_FILE)
 
+        # Сезон каждой строки берётся не позже последней даты обучения модели, которая её оценивает,
+        # см. add_calendar_features. Так test проверяет ту же процедуру, что строит прогноз future.
         with connect(settings.dwh_dsn) as conn:
-            frame = read_features(conn, bounds.test_start)
+            frame = pd.concat([
+                read_features(conn, bounds.test_start, bounds.history_end, season_through=bounds.train_through),
+                read_features(conn, bounds.history_end, season_through=bounds.as_of),
+            ], ignore_index=True)
         frame["split"] = assign_split(frame["loading_date"], bounds)
-        frame = frame.reset_index(drop=True)
 
         test_mask = (frame["split"] == "test").to_numpy()
         test = frame[test_mask]

@@ -91,6 +91,6 @@ def load_window(settings: Settings, start: date, end: date) -> None:
             run.rows_read = counts["prices"]
             run.details["source_rows"] = counts
             _record_stats(target, run)
-
-        with connect(settings.dwh_dsn, autocommit=True) as conn:
-            conn.execute(f"analyze {ANALYZE_TABLES}")
+            # Статистика обновляется вместе с данными: ANALYZE в транзакции видит её строки.
+            # После коммита его сбой пометил бы в журнале как failed уже применённую загрузку.
+            target.execute(f"analyze {ANALYZE_TABLES}")

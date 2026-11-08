@@ -40,8 +40,8 @@ docker compose exec -T postgres psql -U postgres -d dwh -qAtX -v ON_ERROR_STOP=1
 | `core.bridge_price_body_group` | `335077\|e19c42eb2847248ab06cc94506b697a2` |
 | `dq.dq_quarantine_prices` | `203\|b0fda1dbc3152eb3e890827107b46f8a` |
 | `mart.mart_route_card` | `203644\|33a31b9e318fae32264d0f1b774fef90` |
-| `mart.ml_price_predictions` | `17969\|1cb9e555a51ee2e8ac90770c0508635d` |
-| `mart.ml_model_metrics` | `93\|2b728e297404fb09b969c819f9b60d0c` |
+| `mart.ml_price_predictions` | `17969\|c0c7163e87bacb76697a735ae11837a3` |
+| `mart.ml_model_metrics` | `93\|fa4fe00a7c949086fff20c37db793e68` |
 | `mart.mart_market_summary` | `1032935\|9a06699da8fd3d58d2511fffa10fe505` |
 
 Если строк меньше 13, какой-то таблицы нет. Генератор и модель работают с фиксированным зерном, но на другом процессоре или другой сборке CatBoost хэши `ml_price_predictions` и `ml_model_metrics` могут отличаться. Тогда смотрите метрики из следующего шага, а остальные 11 хэшей должны совпасть в любом случае.
@@ -66,10 +66,10 @@ docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$DWH_DB"' < 
 
 | Модель | R² | MAPE, % | RMSE | MAE |
 |---|---:|---:|---:|---:|
-| `catboost_price_v1` | 0,9294 | 13,64 | 50 821 | 25 820 |
+| `catboost_price_v1` | 0,9296 | 13,65 | 50 774 | 25 809 |
 | `ridge_v1` | 0,9271 | 13,59 | 51 647 | 26 177 |
 | `baseline_rate_per_km_v1` | 0,7172 | 42,78 | 101 726 | 62 112 |
-| `ablation_no_price_type` | 0,9260 | 14,11 | 52 043 | 26 679 |
+| `ablation_no_price_type` | 0,9261 | 14,13 | 51 998 | 26 674 |
 | `leak_demo_price_per_km` | 0,9870 | 5,71 | 21 847 | 10 407 |
 
 `leak_demo_price_per_km` специально обучена с утечкой, чтобы было видно, как она выглядит в метриках. Прогнозы она не пишет.
@@ -92,7 +92,7 @@ docker compose run --rm pipeline pytest
 docker compose run --rm pipeline pytest -m stand -s
 ```
 
-Первая команда даёт 251 passed. Тесты создают свои базы `ul_test_*` и рабочие данные не трогают. В `.env.example` стоит `REQUIRE_DB=1`, поэтому без доступной базы интеграционные тесты падают, а не пропускаются молча. Вторая даёт 4 passed: она сравнивает ошибку модели с пределом, который задаёт шум генератора.
+Первая команда даёт 284 passed. Тесты создают свои базы `ul_test_*` и рабочие данные не трогают. В `.env.example` стоит `REQUIRE_DB=1`, поэтому без доступной базы интеграционные тесты падают, а не пропускаются молча. Вторая даёт 4 passed: она сравнивает ошибку модели с пределом, который задаёт шум генератора.
 
 Те же тесты запускает GitHub Actions ([.github/workflows/tests.yml](../.github/workflows/tests.yml)). Его шаги можно повторить локально, на отдельном проекте compose и маленьком источнике:
 
@@ -105,7 +105,7 @@ docker compose down -v
 unset COMPOSE_PROJECT_NAME
 ```
 
-Результат тот же, 251 passed, вместе со сборкой около полутора минут, если образ уже в кэше. Без `COMPOSE_PROJECT_NAME` команды попали бы в основной проект `ul-market`, и `down -v` в конце удалил бы его тома вместе с загруженным источником и хранилищем.
+Результат тот же, 284 passed, вместе со сборкой около полутора минут, если образ уже в кэше. Без `COMPOSE_PROJECT_NAME` команды попали бы в основной проект `ul-market`, и `down -v` в конце удалил бы его тома вместе с загруженным источником и хранилищем.
 
 ## 5. Повторный прогон
 
@@ -143,7 +143,7 @@ docker compose --profile clickhouse exec clickhouse sh -c \
   'clickhouse-client --user "$CLICKHOUSE_USER" --password "$CLICKHOUSE_PASSWORD" -d "$CLICKHOUSE_DB" -q "select count() from mart_route_card final"'
 ```
 
-`clickhouse-mirror` перед публикацией сверяет суммы с PostgreSQL и при расхождении падает, поэтому `0` уже означает, что зеркало совпало. Если вместе с этим профилем запущен и `airflow`, зеркало обновляет ещё и задача DAG `clickhouse_mirror`: в журнале `ops.pipeline_runs` тогда несколько записей `clickhouse-mirror`, и все в статусе `success`. В таблице должно быть 203 644 строки. Примеры запросов дают те же числа, что и в PostgreSQL:
+`clickhouse-mirror` перед публикацией сверяет итоги по месяцам с PostgreSQL и при расхождении падает, поэтому `0` уже означает, что зеркало совпало. Если вместе с этим профилем запущен и `airflow`, зеркало обновляет ещё и задача DAG `clickhouse_mirror`: в журнале `ops.pipeline_runs` тогда несколько записей `clickhouse-mirror`, и все в статусе `success`. В таблице должно быть 203 644 строки. Примеры запросов дают те же числа, что и в PostgreSQL:
 
 ```bash
 docker compose --profile clickhouse exec -T clickhouse sh -c \

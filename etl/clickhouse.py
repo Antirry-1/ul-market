@@ -37,10 +37,31 @@ COLUMNS = (
 # Суммы по месяцу: расхождение в любой ячейке меняет сумму своего месяца.
 # NULL в Postgres и ClickHouse суммы пропускают одинаково, число пропусков сверяется отдельно.
 SUMMED_COLUMNS = (
+    "loading_city_gcid", "unloading_city_gcid",
     "p25_trip", "median_trip", "p75_trip", "avg_trip", "p25_km", "median_km", "p75_km",
     "trips_count", "carriers_count", "cv_rate", "mom_pct", "yoy_pct", "freshness_days",
 )
 NULLABLE_COLUMNS = ("cv_rate", "mom_pct", "yoy_pct")
+# Текст сверяется суммарной длиной в символах: обрезка или сбой кодировки её меняют.
+# char_length в ClickHouse считает символы UTF-8, как и в PostgreSQL, а не байты.
+TEXT_COLUMNS = ("body_group", "weight_category", "loading_city", "unloading_city")
+RELIABILITY_LEVELS = ("HIGH", "MEDIUM", "LOW_DATA")
+
+
+def month_checks() -> tuple[str, ...]:
+    """Выражения сверки по месяцу. Каждое одинаково считается в PostgreSQL и в ClickHouse."""
+    return (
+        "count(*)",
+        *(f"sum({name})" for name in SUMMED_COLUMNS),
+        *(f"count({name})" for name in NULLABLE_COLUMNS),
+        *(f"sum(char_length({name}))" for name in TEXT_COLUMNS),
+        *(f"sum(case when reliability_level = '{level}' then 1 else 0 end)" for level in RELIABILITY_LEVELS),
+        "sum(case when is_partial_month then 1 else 0 end)",
+    )
+
+# Сколько секунд запрос ждёт ответа ClickHouse. Без ограничения зависший сервер держал бы
+# зеркало, и задачу DAG, бесконечно. Самый долгий запрос, вставка всей витрины, идёт секунды.
+REQUEST_TIMEOUT = 300
 
 
 @dataclass(frozen=True)
@@ -49,6 +70,7 @@ class ClickHouse:
     database: str
     user: str
     password: str
+    timeout: float = REQUEST_TIMEOUT
 
     @classmethod
     def from_env(cls) -> "ClickHouse":
@@ -70,7 +92,7 @@ class ClickHouse:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(request) as response:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 return response.read().decode("utf-8")
         except urllib.error.HTTPError as error:
             raise RuntimeError(error.read().decode("utf-8", "replace")) from error
@@ -88,10 +110,10 @@ def export_query() -> str:
 
 
 def month_totals_query(table: str, month_expression: str) -> str:
-    sums = ", ".join(f"sum({name})" for name in SUMMED_COLUMNS)
-    nulls = ", ".join(f"count({name})" for name in NULLABLE_COLUMNS)
+    """Месяц и итоги сверки по нему; число строк месяца идёт вторым столбцом."""
+    checks = ", ".join(month_checks())
     return (
-        f"select {month_expression} as month_key, count(*), {sums}, {nulls} "
+        f"select {month_expression} as month_key, {checks} "
         f"from {table} group by month_key order by month_key"
     )
 

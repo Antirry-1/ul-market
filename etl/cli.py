@@ -6,7 +6,7 @@ import argparse
 from datetime import date
 
 from etl.config import Settings
-from etl.extract import source_date_range
+from etl.extract import full_window
 from etl.init_dwh import init_dwh
 from etl.load import load_window
 from etl.log import setup_logging
@@ -18,7 +18,7 @@ def add_window_arguments(parser: argparse.ArgumentParser) -> None:
     group = parser.add_argument_group("окно загрузки, полуинтервал по loading_date")
     group.add_argument("--start-date", type=date.fromisoformat, help="включительно")
     group.add_argument("--end-date", type=date.fromisoformat, help="не включительно")
-    group.add_argument("--full", action="store_true", help="всё окно источника")
+    group.add_argument("--full", action="store_true", help="всё окно источника и уже загруженного")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -42,11 +42,11 @@ def resolve_window(args: argparse.Namespace, settings: Settings) -> tuple[date, 
 
 def requested_window(args: argparse.Namespace, settings: Settings) -> tuple[date, date]:
     if args.command == "run-all" and not (args.start_date or args.end_date):
-        return source_date_range(settings.source_dsn)
+        return full_window(settings.source_dsn, settings.dwh_dsn)
     if args.full:
         if args.start_date or args.end_date:
             raise SystemExit("--full нельзя сочетать с --start-date и --end-date")
-        return source_date_range(settings.source_dsn)
+        return full_window(settings.source_dsn, settings.dwh_dsn)
     if not (args.start_date and args.end_date):
         raise SystemExit("Укажите --start-date и --end-date или --full")
     return args.start_date, args.end_date

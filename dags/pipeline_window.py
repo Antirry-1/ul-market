@@ -14,6 +14,10 @@ DAILY_HORIZON = timedelta(days=120)
 # Задним числом сделки не заводятся, но после погрузки их могут поправить или удалить.
 # 35 дней покрывают 30-дневный порог свежести витрины и несколько пропущенных запусков.
 DAILY_LOOKBACK = timedelta(days=35)
+# Предел для одной задачи DAG. Полная загрузка или обучение идут минуты, ожидание занятого
+# хранилища ограничено PIPELINE_LOCK_TIMEOUT в 15 минут. Задача, которая идёт дольше, зависла:
+# Airflow её снимает, и следующий шаг закрывает её запись в журнале как прерванную.
+TASK_TIMEOUT = timedelta(hours=1)
 
 
 def load_arguments(conf: Mapping[str, object], interval_start: datetime, interval_end: datetime) -> str:

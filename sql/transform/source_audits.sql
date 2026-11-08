@@ -33,12 +33,19 @@ totals as (
     select 'body_types', count(*) from raw.body_types
     union all
     select 'exchange_rates', count(*) from raw.exchange_rates
+),
+-- Число пропавших считается один раз на справочник. Подзапрос в where считал бы его
+-- заново на каждую пропавшую строку, то есть квадратично как раз при массовой потере.
+gone_counts as (
+    select reference, count(*) as gone
+    from gone
+    group by reference
 )
 select g.reference, g.id
 from gone g
+join gone_counts c on c.reference = g.reference
 join totals t on t.reference = g.reference
-where (select count(*) from gone x where x.reference = g.reference)
-      > t.total * current_setting('app.shrink_limit')::numeric;
+where c.gone > t.total * current_setting('app.shrink_limit')::numeric;
 
 -- Сделки окна, которых нет в снимке, то есть удалённые в источнике: перенесённые за пределы
 -- окна extract дочитывает по id. Поштучно это обычное дело, их считает аудит deal_left_window.

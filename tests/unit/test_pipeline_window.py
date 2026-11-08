@@ -7,7 +7,12 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "dags"))
 
-from pipeline_window import clickhouse_available, load_arguments, retrain_requested  # noqa: E402
+from pipeline_window import (  # noqa: E402
+    TASK_TIMEOUT,
+    clickhouse_available,
+    load_arguments,
+    retrain_requested,
+)
 
 START = datetime(2026, 10, 25, tzinfo=timezone.utc)
 END = datetime(2026, 10, 26, tzinfo=timezone.utc)
@@ -84,3 +89,11 @@ def test_mirror_runs_only_when_clickhouse_answers():
 def test_unresolvable_clickhouse_host_means_skip():
     env = {"CLICKHOUSE_HOST": "clickhouse.invalid", "CLICKHOUSE_PORT": "8123"}
     assert clickhouse_available(env) is False
+
+
+def test_task_timeout_leaves_room_for_waiting_on_busy_storage():
+    # Задача сначала может ждать занятое хранилище, и только потом работает сама.
+    from etl.db import DEFAULT_PIPELINE_LOCK_TIMEOUT
+
+    assert DEFAULT_PIPELINE_LOCK_TIMEOUT == "15min"
+    assert TASK_TIMEOUT >= timedelta(minutes=15) * 3

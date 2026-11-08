@@ -26,7 +26,7 @@ from etl.runs import locked_run
 from ml import storage
 from ml.baseline import LogRidge, RatePerKmBaseline
 from ml.boosting import BoostingParams, fit_boosting, predict_boosting
-from ml.features import FEATURES, TARGET, read_features
+from ml.features import FEATURES, TARGET, add_calendar_features, read_features
 from ml.metrics import regression_metrics
 from ml.split import SplitBounds
 
@@ -45,9 +45,16 @@ SELECTION_METRIC = "wape_pct"
 
 
 def split_train_validation(frame: pd.DataFrame, bounds: SplitBounds) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Хвост train для выбора параметров и ранней остановки.
+
+    Сезон строк хвоста берётся не позже последней даты, на которой учатся кандидаты, как у test
+    в ml/score.py. Иначе параметры подбирались бы на прогнозе с сезоном за пределами обучения,
+    а test проверял бы прогноз без него.
+    """
     dates = pd.to_datetime(frame["loading_date"])
     is_validation = dates >= pd.Timestamp(bounds.val_start)
-    return frame[~is_validation], frame[is_validation]
+    validation = add_calendar_features(frame[is_validation], bounds.fit_through)
+    return frame[~is_validation], validation
 
 
 def select_boosting(

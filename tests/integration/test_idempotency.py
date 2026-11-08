@@ -5,6 +5,7 @@ from datetime import date
 import pytest
 
 from etl.audits import AuditFailed
+from etl.extract import full_window
 from etl.load import load_window
 from etl.marts import build_marts
 
@@ -91,6 +92,28 @@ def test_deal_removed_from_source_leaves_window(source, load, query):
     load()
     assert query("select price_id from core.fact_price") == [(keep,)]
     assert query("select count(*) from core.bridge_price_body_group") == [(1,)]
+
+
+def test_full_reload_removes_deal_deleted_at_edge_of_source(source, query, settings):
+    # Окно --full по одному источнику кончилось бы на 2026-09-16 и не задело бы удалённую сделку.
+    keep = source.add_deal(loading_date=date(2026, 9, 15))
+    latest = source.add_deal(loading_date=date(2026, 12, 20))
+    load_window(settings, *full_window(settings.source_dsn, settings.dwh_dsn))
+    source.execute("delete from prices where id = %s", (latest,))
+
+    window = full_window(settings.source_dsn, settings.dwh_dsn)
+    assert window == (date(2026, 9, 15), date(2026, 12, 21))
+    load_window(settings, *window)
+
+    assert query("select id from raw.prices") == [(keep,)]
+    assert query("select price_id from core.fact_price") == [(keep,)]
+    assert query("select price_id from core.fact_price_date") == [(keep,)]
+
+
+def test_full_window_on_empty_dwh_follows_source(source, settings):
+    source.add_deal(loading_date=date(2026, 9, 15))
+    source.add_deal(loading_date=date(2026, 10, 1))
+    assert full_window(settings.source_dsn, settings.dwh_dsn) == (date(2026, 9, 15), date(2026, 10, 2))
 
 
 def test_deal_moved_out_of_reloaded_window_keeps_one_version(source, query, settings):

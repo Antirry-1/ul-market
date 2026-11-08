@@ -175,3 +175,21 @@ def source_date_range(source_dsn: str) -> tuple[date, date]:
     if low is None:
         raise RuntimeError("В источнике нет сделок")
     return low, high
+
+
+def full_window(source_dsn: str, dwh_dsn: str) -> tuple[date, date]:
+    """Окно полной загрузки: даты источника вместе с датами, уже лежащими в raw.
+
+    Только по источнику окно сужается, когда там удаляют сделку с крайней датой погрузки.
+    Такая сделка оказалась бы вне окна и навсегда осталась бы в raw, core и прогнозах.
+    """
+    low, high = source_date_range(source_dsn)
+    with psycopg.connect(dwh_dsn) as conn:
+        # До первого init-dwh таблицы ещё нет: тогда окно задаёт один источник.
+        if conn.execute("select to_regclass('raw.prices') is not null").fetchone()[0]:
+            raw_low, raw_high = conn.execute(
+                "select min(loading_date), max(loading_date) + 1 from raw.prices"
+            ).fetchone()
+            if raw_low is not None:
+                low, high = min(low, raw_low), max(high, raw_high)
+    return low, high

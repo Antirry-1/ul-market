@@ -112,3 +112,14 @@ def test_same_named_cities_stay_separate_routes(source, build, query):
         ("Москва → Октябрьский (Волгоградская обл.)", Decimal("300000.00")),
         ("Москва → Октябрьский (Республика Башкортостан)", Decimal("100000.00")),
     ]
+
+
+def test_journal_counts_rows_of_both_marts(source, build, query):
+    source.add_deal()
+    build()
+    rows_loaded, details = query(
+        "select rows_loaded, details from ops.pipeline_runs where step = 'build-marts' order by run_id desc limit 1"
+    )[0]
+    assert rows_loaded == query("select count(*) from mart.mart_route_card")[0][0]
+    assert details["market_summary_rows"] == query("select count(*) from mart.mart_market_summary")[0][0]
+    assert details["market_summary_rows"] > rows_loaded

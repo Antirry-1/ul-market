@@ -44,14 +44,22 @@ FORBIDDEN_FEATURES = frozenset({
 MISSING_CATEGORY = "missing"
 
 
-def add_calendar_features(frame: pd.DataFrame) -> pd.DataFrame:
-    """Календарные признаки даты погрузки. Гармоники сохраняют близость на стыке периодов."""
+def add_calendar_features(frame: pd.DataFrame, season_through: date | None = None) -> pd.DataFrame:
+    """Календарные признаки даты погрузки. Гармоники сохраняют близость на стыке периодов.
+
+    season_through - последняя дата обучающих данных. Месяц и день года у более поздних дат
+    берутся с неё. Деревья не продолжают сезонность за пределы обучения, а относят такую дату
+    к крайнему листу, и по гармоникам январь оказывается рядом с июлем: прогноз на январь
+    выходил ниже октябрьского. С подстановкой будущая заявка получает сезонную поправку
+    последней известной даты. Год и день недели остаются настоящими.
+    """
     result = frame.copy()
     dates = pd.to_datetime(result["loading_date"])
+    season = dates if season_through is None else dates.clip(upper=pd.Timestamp(season_through))
     result["year"] = dates.dt.year
-    result["month"] = dates.dt.month
+    result["month"] = season.dt.month
     result["day_of_week"] = dates.dt.dayofweek
-    result["day_of_year"] = dates.dt.dayofyear
+    result["day_of_year"] = season.dt.dayofyear
     for name, period in (("month", 12.0), ("day_of_week", 7.0), ("day_of_year", 365.25)):
         angle = 2 * np.pi * result[name] / period
         result[f"{name}_sin"] = np.sin(angle)
@@ -59,8 +67,8 @@ def add_calendar_features(frame: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
-def prepare_features(frame: pd.DataFrame) -> pd.DataFrame:
-    result = add_calendar_features(frame)
+def prepare_features(frame: pd.DataFrame, season_through: date | None = None) -> pd.DataFrame:
+    result = add_calendar_features(frame, season_through)
     for column in ("price_rub", "distance", "total_weight", "total_volume",
                    "origin_lat", "origin_lon", "destination_lat", "destination_lon"):
         result[column] = pd.to_numeric(result[column], errors="coerce").astype("float64")
@@ -78,8 +86,17 @@ def prepare_features(frame: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
-def read_features(conn: psycopg.Connection, start: date, end: date | None = None) -> pd.DataFrame:
-    """Читает полуинтервал [start, end) по дате погрузки; end=None означает без верхней границы."""
+def read_features(
+    conn: psycopg.Connection,
+    start: date,
+    end: date | None = None,
+    *,
+    season_through: date | None = None,
+) -> pd.DataFrame:
+    """Читает полуинтервал [start, end) по дате погрузки; end=None означает без верхней границы.
+
+    season_through см. в add_calendar_features.
+    """
     query = "select * from core.v_ml_features where loading_date >= %s"
     params: list[date] = [start]
     if end is not None:
@@ -89,4 +106,4 @@ def read_features(conn: psycopg.Connection, start: date, end: date | None = None
         cursor.execute(query + " order by loading_date, price_id", params)
         columns = [column.name for column in cursor.description]
         frame = pd.DataFrame(cursor.fetchall(), columns=columns)
-    return prepare_features(frame)
+    return prepare_features(frame, season_through)

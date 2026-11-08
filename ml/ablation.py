@@ -17,7 +17,7 @@ from etl.runs import locked_run
 from ml import storage
 from ml.baseline import LogRidge
 from ml.boosting import BoostingParams, fit_boosting, predict_boosting
-from ml.features import CATEGORICAL_FEATURES, TARGET, read_features
+from ml.features import CATEGORICAL_FEATURES, FEATURES, TARGET, read_features
 from ml.metrics import sliced_metrics
 from ml.split import SplitBounds, assign_split
 
@@ -40,6 +40,7 @@ def run_ablation(settings: Settings) -> None:
         release = storage.current_release(settings.model_dir)
         meta = storage.read_meta(release)
         storage.check_split(meta, bounds)
+        storage.check_features(meta, FEATURES)
         params = BoostingParams(**meta["params"])
         features = meta["features"]
 
@@ -53,7 +54,8 @@ def run_ablation(settings: Settings) -> None:
         }
 
         with connect(settings.dwh_dsn) as conn:
-            frame = read_features(conn, bounds.train_start)
+            frame = read_features(conn, bounds.train_start, bounds.history_end,
+                                  season_through=bounds.train_through)
         frame["split"] = assign_split(frame["loading_date"], bounds)
         train = frame[(frame["split"] == "train") & ~frame["outlier_mark"]]
         test = frame[frame["split"] == "test"]

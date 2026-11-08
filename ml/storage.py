@@ -97,6 +97,27 @@ def check_split(meta: dict, bounds: SplitBounds) -> None:
         )
 
 
+class FeaturesMismatch(RuntimeError):
+    """Модель обучена на другом наборе признаков, чем строит текущий код."""
+
+
+def check_features(meta: dict, features: tuple[str, ...]) -> None:
+    """Сверяет признаки версии с признаками текущего кода.
+
+    Скоринг подаёт модели колонки по списку из версии. После переименования или удаления
+    признака такой колонки в данных уже нет, и запуск падал бы с KeyError на середине.
+    """
+    trained = meta.get("features")
+    if trained != list(features):
+        missing = sorted(set(trained or ()) - set(features))
+        added = sorted(set(features) - set(trained or ()))
+        raise FeaturesMismatch(
+            f"Модель {meta['release']} обучена на другом наборе признаков "
+            f"(нет в коде: {missing or '-'}, новые: {added or '-'}). "
+            "Переобучите модель: python -m ml.train"
+        )
+
+
 def write_metrics(
     conn: psycopg.Connection,
     model_name: str,

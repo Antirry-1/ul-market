@@ -30,6 +30,11 @@ class SplitBounds:
         )
 
     @property
+    def fit_through(self) -> date:
+        """Последняя дата погрузки, на которой учатся кандидаты при выборе параметров."""
+        return self.val_start - timedelta(days=1)
+
+    @property
     def train_through(self) -> date:
         """Последняя дата погрузки в обучении модели, по которой считаются метрики test."""
         return self.test_start - timedelta(days=1)

@@ -1,3 +1,5 @@
+from datetime import date
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -94,3 +96,27 @@ def test_city_features_are_gc_id_labels():
                   body_type=[56], price_type=[3])
     row = prepare_features(pd.DataFrame(source)).iloc[0]
     assert (row["origin_city_id"], row["destination_city_id"]) == ("1001", "2001")
+
+
+SEASON_COLUMNS = ["month", "day_of_year", "month_sin", "month_cos", "day_of_year_sin", "day_of_year_cos"]
+
+
+def test_season_after_training_comes_from_last_training_date():
+    frame = add_calendar_features(
+        pd.DataFrame({"loading_date": ["2026-10-26", "2026-12-05", "2027-01-23"]}),
+        season_through=date(2026, 10, 26),
+    )
+    assert (frame[SEASON_COLUMNS].nunique() == 1).all()
+    assert frame.loc[0, "month"] == 10 and frame.loc[0, "day_of_year"] == 299
+
+
+def test_season_cut_keeps_year_and_weekday():
+    row = add_calendar_features(pd.DataFrame({"loading_date": ["2027-01-23"]}),
+                                season_through=date(2026, 10, 26)).iloc[0]
+    assert (row["year"], row["day_of_week"]) == (2027, 5)
+
+
+def test_season_cut_does_not_touch_earlier_dates():
+    dates = pd.DataFrame({"loading_date": pd.date_range("2026-07-26", "2026-10-26")})
+    pd.testing.assert_frame_equal(add_calendar_features(dates, season_through=date(2026, 10, 26)),
+                                  add_calendar_features(dates))

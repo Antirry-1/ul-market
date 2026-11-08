@@ -5,8 +5,8 @@ import pytest
 
 from ml.split import SplitBounds
 from ml.storage import (
-    CURRENT_LINK, FORECAST_CATBOOST_FILE, META_FILE, RELEASE_FILES, SplitMismatch, check_files,
-    check_split, current_release, new_release, read_meta,
+    CURRENT_LINK, FORECAST_CATBOOST_FILE, META_FILE, RELEASE_FILES, FeaturesMismatch, SplitMismatch,
+    check_features, check_files, check_split, current_release, new_release, read_meta,
 )
 
 
@@ -88,3 +88,27 @@ def test_other_as_of_is_rejected():
 def test_release_without_bounds_is_rejected():
     with pytest.raises(SplitMismatch, match="без записанных границ"):
         check_split({"release": "release-a"}, BOUNDS)
+
+
+FEATURES = ("distance", "origin_city_id")
+
+
+def test_same_features_pass():
+    check_features({"release": "release-a", "features": list(FEATURES)}, FEATURES)
+
+
+def test_renamed_feature_is_rejected_with_names():
+    meta = {"release": "release-a", "features": ["distance", "origin_city"]}
+    with pytest.raises(FeaturesMismatch, match=r"нет в коде: \['origin_city'\], новые: \['origin_city_id'\].*ml.train"):
+        check_features(meta, FEATURES)
+
+
+def test_feature_order_matters():
+    # CatBoost сверяет признаки по позиции, поэтому другой порядок тоже требует переобучения.
+    with pytest.raises(FeaturesMismatch):
+        check_features({"release": "release-a", "features": list(reversed(FEATURES))}, FEATURES)
+
+
+def test_release_without_features_is_rejected():
+    with pytest.raises(FeaturesMismatch, match="ml.train"):
+        check_features({"release": "release-a"}, FEATURES)

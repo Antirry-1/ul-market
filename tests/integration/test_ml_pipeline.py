@@ -1,5 +1,6 @@
 """Сквозной ML-контур на маленьком наборе."""
 
+import json
 from dataclasses import replace
 from datetime import date, timedelta
 
@@ -12,7 +13,9 @@ from ml.ablation import LEAK_DEMO_MODEL, NO_PRICE_TYPE_MODEL, run_ablation
 from ml.boosting import BoostingParams
 from ml.score import score
 from ml.split import SplitBounds
-from ml.storage import CURRENT_LINK, FORECAST_CATBOOST_FILE, MAIN_MODEL, SplitMismatch, current_release
+from ml.storage import (
+    CURRENT_LINK, FORECAST_CATBOOST_FILE, MAIN_MODEL, META_FILE, FeaturesMismatch, SplitMismatch, current_release,
+)
 from ml.train import train
 
 PREDICTIONS_HASH = """
@@ -374,3 +377,49 @@ def test_score_refuses_model_trained_on_other_split(trained, query, settings):
     assert query(PREDICTIONS_HASH) == before
     assert query("select status, details->>'error' like '%%Переобучите%%' from ops.pipeline_runs "
                  "where step = 'ml-score' order by run_id desc limit 1") == [("failed", True)]
+
+
+def test_score_refuses_model_with_other_features(trained, query, settings):
+    # Версия, обученная до переименования признака, ждёт колонку, которой код больше не строит.
+    meta_path = current_release(settings.model_dir) / META_FILE
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    meta["features"] = ["origin_city" if name == "origin_city_id" else name for name in meta["features"]]
+    meta_path.write_text(json.dumps(meta), encoding="utf-8")
+    before = query(PREDICTIONS_HASH)
+    with pytest.raises(FeaturesMismatch, match="нет в коде: \\['origin_city'\\].*Переобучите"):
+        score(settings)
+    with pytest.raises(FeaturesMismatch):
+        run_ablation(settings)
+    assert query(PREDICTIONS_HASH) == before
+
+
+@pytest.fixture
+def season_twins(deals):
+    """Пары одинаковых сделок, у которых различается только дата погрузки, в один день недели.
+
+    Пара test лежит после последней даты обучения модели для метрик, пара future после as_of.
+    """
+    pairs = {
+        "test": (date(2026, 10, 10), date(2026, 10, 24)),
+        "future": (date(2026, 11, 28), date(2027, 1, 23)),
+    }
+    return {
+        split: [deals.add_deal(loading_date=day, distance=1200.0, price=105000.0) for day in days]
+        for split, days in pairs.items()
+    }
+
+
+def test_season_does_not_go_past_training(season_twins, load, settings, fast_candidates, query):
+    # Деревья не продолжают сезонность за пределы обучения, поэтому сезон таких дат берётся
+    # с последней даты обучения своей модели, и пара получает одинаковый прогноз.
+    load()
+    build_marts(settings)
+    train(settings)
+    score(settings)
+    for split, ids in season_twins.items():
+        rows = query(
+            "select split, predicted_price_rub from mart.ml_price_predictions where price_id = any(%s) order by 1",
+            (ids,),
+        )
+        assert [row[0] for row in rows] == [split, split]
+        assert rows[0][1] == rows[1][1], split
