@@ -39,9 +39,8 @@ def test_city_label_is_unique_per_gc_id(source, load, query):
         (2005, "Ленинск #2005"),
     ]
     assert query("select city_label from core.v_city_label where gc_id = 1001") == [("Москва",)]
-    assert query("select origin_city, destination_city from core.v_ml_features") == [
-        ("Москва", "Октябрьский (Республика Башкортостан)"),
-    ]
+    # Модели подпись не нужна: город она получает по gc_id, см. ml/features.py.
+    assert query("select loading_city_gcid, unloading_city_gcid from core.v_ml_features") == [(1001, 2001)]
 
 
 def test_joins_keep_one_row_per_deal(source, load, query):

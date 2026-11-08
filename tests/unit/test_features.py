@@ -81,6 +81,16 @@ def test_missing_categories_get_marker():
     source = {name: [None] for name in CATEGORICAL_FEATURES}
     source.update({name: [1.0] for name in ("price_rub", "distance", "total_weight", "total_volume",
                                             "origin_lat", "origin_lon", "destination_lat", "destination_lon")})
-    source["loading_date"] = ["2026-10-05"]
+    source.update(loading_date=["2026-10-05"], loading_city_gcid=[None], unloading_city_gcid=[None])
     frame = prepare_features(pd.DataFrame(source))
     assert (frame.loc[0, list(CATEGORICAL_FEATURES)] == MISSING_CATEGORY).all()
+
+
+def test_city_features_are_gc_id_labels():
+    source = {name: ["x"] for name in CATEGORICAL_FEATURES}
+    source.update({name: [1.0] for name in ("price_rub", "distance", "total_weight", "total_volume",
+                                            "origin_lat", "origin_lon", "destination_lat", "destination_lon")})
+    source.update(loading_date=["2026-10-05"], loading_city_gcid=[1001], unloading_city_gcid=[2001],
+                  body_type=[56], price_type=[3])
+    row = prepare_features(pd.DataFrame(source)).iloc[0]
+    assert (row["origin_city_id"], row["destination_city_id"]) == ("1001", "2001")

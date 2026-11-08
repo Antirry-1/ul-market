@@ -20,6 +20,7 @@ WINDOW_FILES = (
     "transform/quarantine.sql",
     "transform/fact.sql",
     "transform/bridges.sql",
+    "transform/stale_predictions.sql",
 )
 
 SOURCE_AUDITS = "transform/source_audits.sql"

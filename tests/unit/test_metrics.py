@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ml.metrics import regression_metrics, sliced_metrics
+from ml.metrics import EmptySample, regression_metrics, sliced_metrics
 
 
 def test_values_on_known_errors():
@@ -18,6 +18,11 @@ def test_values_on_known_errors():
 
 def test_r2_undefined_for_constant_target():
     assert regression_metrics(np.array([5.0, 5.0]), np.array([4.0, 6.0]))["r2"] is None
+
+
+def test_empty_sample_is_an_error_not_nan():
+    with pytest.raises(EmptySample):
+        regression_metrics(np.array([]), np.array([]))
 
 
 def test_outliers_counted_only_in_all_rows():

@@ -40,8 +40,8 @@ join totals t on t.reference = g.reference
 where (select count(*) from gone x where x.reference = g.reference)
       > t.total * current_setting('app.shrink_limit')::numeric;
 
--- Сделки окна, которых нет в снимке: удалены в источнике или перенесены за пределы окна.
--- Поштучно это обычное дело, их считает предупреждающий аудит deal_left_window.
+-- Сделки окна, которых нет в снимке, то есть удалённые в источнике: перенесённые за пределы
+-- окна extract дочитывает по id. Поштучно это обычное дело, их считает аудит deal_left_window.
 -- Массовая пропажа похожа на сбой источника: без проверки окно было бы стёрто из raw и core.
 -- @audit source_window_shrank error
 -- left join, а не not exists в списке колонок: там подзапрос шёл бы на каждую строку окна.

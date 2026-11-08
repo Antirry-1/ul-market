@@ -9,9 +9,15 @@ DISTANCE_BUCKETS = (0.0, 500.0, 1000.0, 2000.0, np.inf)
 DISTANCE_LABELS = ("0-500", "500-1000", "1000-2000", "2000+")
 
 
+class EmptySample(ValueError):
+    """Метрики пустой выборки не определены: numpy вернул бы NaN, и он ушёл бы в таблицу метрик."""
+
+
 def regression_metrics(actual: np.ndarray, predicted: np.ndarray) -> dict[str, float | int | None]:
     actual = np.asarray(actual, dtype="float64")
     predicted = np.asarray(predicted, dtype="float64")
+    if actual.size == 0:
+        raise EmptySample("Нет строк для расчёта метрик: проверьте AS_OF и загруженное окно")
     error = actual - predicted
     abs_error = np.abs(error)
     ape = abs_error / actual * 100

@@ -7,7 +7,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "dags"))
 
-from pipeline_window import load_arguments, retrain_requested  # noqa: E402
+from pipeline_window import clickhouse_available, load_arguments, retrain_requested  # noqa: E402
 
 START = datetime(2026, 10, 25, tzinfo=timezone.utc)
 END = datetime(2026, 10, 26, tzinfo=timezone.utc)
@@ -67,3 +67,20 @@ def test_value_reaching_bash_must_be_a_date():
 @pytest.mark.parametrize(("conf", "expected"), [({}, False), ({"retrain": True}, True)])
 def test_retrain_only_on_request(conf, expected):
     assert retrain_requested(conf) is expected
+
+
+def test_mirror_skipped_without_clickhouse_settings():
+    assert clickhouse_available({}, ping=lambda url: True) is False
+
+
+def test_mirror_runs_only_when_clickhouse_answers():
+    env = {"CLICKHOUSE_HOST": "clickhouse", "CLICKHOUSE_PORT": "8123"}
+    urls = []
+    assert clickhouse_available(env, ping=lambda url: urls.append(url) or True) is True
+    assert urls == ["http://clickhouse:8123/ping"]
+    assert clickhouse_available(env, ping=lambda url: False) is False
+
+
+def test_unresolvable_clickhouse_host_means_skip():
+    env = {"CLICKHOUSE_HOST": "clickhouse.invalid", "CLICKHOUSE_PORT": "8123"}
+    assert clickhouse_available(env) is False

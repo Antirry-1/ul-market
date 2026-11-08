@@ -30,7 +30,7 @@ class SourceTable:
     join_prices: bool = False
 
 
-SOURCE_TABLES = (
+REFERENCE_TABLES = (
     SourceTable(
         "cities",
         ("id", "full_name_local", "full_name_gc", "gc_id", "name", "longitude", "latitude",
@@ -39,13 +39,20 @@ SOURCE_TABLES = (
     ),
     SourceTable("body_types", ("id", "name", "id_from_1C", "std_id"), windowed=False),
     SourceTable("exchange_rates", ("id", "num_code", "value", "setting_date"), windowed=False),
-    SourceTable("prices", PRICE_COLUMNS, windowed=True),
+)
+PRICES = SourceTable("prices", PRICE_COLUMNS, windowed=True)
+# Связи сделок отбираются по сделке: по её дате погрузки или по её id.
+LINK_TABLES = (
     SourceTable("price_dates", ("id", "price_id", "price_date"), windowed=True, join_prices=True),
     SourceTable("price_body_types", ("id", "price_id", "body_type_id"), windowed=True, join_prices=True),
 )
 
 
-def _select_statement(table: SourceTable) -> sql.Composable:
+def _select_statement(table: SourceTable, *, only_ids: bool = False) -> sql.Composable:
+    """Строки таблицы из окна и строки сделок из списка ids.
+
+    only_ids оставляет только список: так дочитываются сделки, которые ушли из окна.
+    """
     columns = sql.SQL(", ").join(sql.Identifier("t", column) for column in table.columns)
     statement = sql.SQL("select {columns} from {table} t").format(
         columns=columns, table=sql.Identifier(table.name)
@@ -54,9 +61,13 @@ def _select_statement(table: SourceTable) -> sql.Composable:
         statement += sql.SQL(" join prices p on p.id = t.price_id")
     if table.windowed:
         alias = "p" if table.join_prices else "t"
-        statement += sql.SQL(" where {col} >= %(start)s and {col} < %(end)s").format(
-            col=sql.Identifier(alias, "loading_date")
-        )
+        deal_id = sql.Identifier(alias, "id")
+        if only_ids:
+            statement += sql.SQL(" where {id} = any(%(ids)s::bigint[])").format(id=deal_id)
+        else:
+            statement += sql.SQL(
+                " where ({col} >= %(start)s and {col} < %(end)s) or {id} = any(%(ids)s::bigint[])"
+            ).format(col=sql.Identifier(alias, "loading_date"), id=deal_id)
     return statement
 
 
@@ -73,25 +84,54 @@ def _create_temp_table(target: psycopg.Connection, table: SourceTable) -> sql.Id
     return temp_name
 
 
-def _copy_table(
+def _copy_rows(
     source: psycopg.Connection,
     target: psycopg.Connection,
     table: SourceTable,
-    start: date,
-    end: date,
-) -> int:
-    temp_name = _create_temp_table(target, table)
-    copy_out = sql.SQL("copy ({select}) to stdout").format(select=_select_statement(table))
+    temp_name: sql.Identifier,
+    statement: sql.Composable,
+    params: dict | None,
+) -> None:
+    copy_out = sql.SQL("copy ({select}) to stdout").format(select=statement)
     copy_in = sql.SQL("copy {tmp} ({columns}) from stdin").format(
         tmp=temp_name,
         columns=sql.SQL(", ").join(sql.Identifier(column) for column in table.columns),
     )
-    params = {"start": start, "end": end} if table.windowed else None
     with source.cursor().copy(copy_out, params) as reader, target.cursor().copy(copy_in) as writer:
         for block in reader:
             writer.write(block)
+
+
+def _finish_temp_table(target: psycopg.Connection, temp_name: sql.Identifier) -> int:
     target.execute(sql.SQL("analyze {tmp}").format(tmp=temp_name))
     return target.execute(sql.SQL("select count(*) from {tmp}").format(tmp=temp_name)).fetchone()[0]
+
+
+def _deals_left_window(target: psycopg.Connection, start: date, end: date) -> list[int]:
+    """Сделки окна в raw, которых нет в снимке окна: их дата погрузки сменилась или их удалили."""
+    rows = target.execute(
+        """
+        select r.id
+        from raw.prices r
+        left join tmp_prices p on p.id = r.id
+        where r.loading_date >= %s and r.loading_date < %s
+          and p.id is null
+        order by r.id
+        """,
+        (start, end),
+    ).fetchall()
+    return [deal_id for (deal_id,) in rows]
+
+
+def _extract(
+    source: psycopg.Connection,
+    target: psycopg.Connection,
+    table: SourceTable,
+    params: dict | None,
+) -> int:
+    temp_name = _create_temp_table(target, table)
+    _copy_rows(source, target, table, temp_name, _select_statement(table), params)
+    return _finish_temp_table(target, temp_name)
 
 
 def extract_to_temp(
@@ -100,10 +140,27 @@ def extract_to_temp(
     start: date,
     end: date,
 ) -> dict[str, int]:
-    """Читает все таблицы одним снимком: сделки и связанные строки согласованы между собой."""
+    """Читает все таблицы одним снимком: сделки и связанные строки согласованы между собой.
+
+    Сделка, у которой дата погрузки ушла за пределы окна, дочитывается по id в том же снимке.
+    Иначе перезагрузка окна удалила бы её из raw и core, и она вернулась бы только с загрузкой
+    своего нового окна. По id не находятся только сделки, удалённые в источнике.
+    """
     source.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
     source.read_only = True
-    counts = {table.name: _copy_table(source, target, table, start, end) for table in SOURCE_TABLES}
+    counts = {table.name: _extract(source, target, table, None) for table in REFERENCE_TABLES}
+
+    in_window = _extract(source, target, PRICES, {"start": start, "end": end, "ids": []})
+    left = _deals_left_window(target, start, end)
+    counts["prices"] = in_window
+    if left:
+        _copy_rows(source, target, PRICES, sql.Identifier("tmp_prices"),
+                   _select_statement(PRICES, only_ids=True), {"ids": left})
+        counts["prices"] = _finish_temp_table(target, sql.Identifier("tmp_prices"))
+    counts["prices_moved_out_of_window"] = counts["prices"] - in_window
+
+    for table in LINK_TABLES:
+        counts[table.name] = _extract(source, target, table, {"start": start, "end": end, "ids": left})
     source.rollback()
     log_event(logger, "source_extracted", window_start=start, window_end=end, **counts)
     return counts

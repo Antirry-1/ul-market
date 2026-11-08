@@ -14,8 +14,8 @@ from core.fact_price f
 join tmp_prices p on p.id = f.price_id
 where not exists (select 1 from core.bridge_price_body_group b where b.price_id = f.price_id);
 
--- Сделка была в окне, но источник её больше не отдаёт: удалена или перенесена за пределы окна.
--- Перенесённая вернётся только после загрузки своего нового окна.
+-- Сделка была в окне, но источник её больше не отдаёт: её удалили.
+-- Сделку, перенесённую за пределы окна, extract дочитывает по id, поэтому сюда она не попадает.
 -- @audit deal_left_window warn
 select a.price_id
 from tmp_affected a

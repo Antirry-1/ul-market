@@ -93,17 +93,40 @@ def test_deal_removed_from_source_leaves_window(source, load, query):
     assert query("select count(*) from core.bridge_price_body_group") == [(1,)]
 
 
-def test_deal_moved_out_of_reloaded_window_is_reported(source, query, settings):
-    deal_id = source.add_deal(loading_date=date(2026, 9, 15), dates=[date(2026, 9, 15)])
+def test_deal_moved_out_of_reloaded_window_keeps_one_version(source, query, settings):
+    deal_id = source.add_deal(loading_date=date(2026, 9, 15), dates=[date(2026, 9, 15)], links=[56])
     load_window(settings, date(2026, 9, 1), date(2026, 10, 1))
     source.execute("update prices set loading_date = '2026-08-15' where id = %s", (deal_id,))
-    load_window(settings, date(2026, 9, 1), date(2026, 10, 1))
-    audits = query("select details -> 'audits' from ops.pipeline_runs order by run_id desc limit 1")[0][0]
-    assert audits["deal_left_window"] == 1
-    assert query("select count(*) from core.fact_price") == [(0,)]
+    source.execute("update price_dates set price_date = '2026-08-15' where price_id = %s", (deal_id,))
 
+    # Перезагружается старое окно сделки, а не новое: сделка всё равно не пропадает.
+    load_window(settings, date(2026, 9, 1), date(2026, 10, 1))
+
+    assert query("select price_id, loading_date from core.fact_price") == [(deal_id, date(2026, 8, 15))]
+    assert query("select price_date from core.fact_price_date") == [(date(2026, 8, 15),)]
+    assert query("select count(*) from core.bridge_price_body_group") == [(1,)]
+    assert query("select count(*) from raw.prices") == [(1,)]
+    run = query("select details from ops.pipeline_runs order by run_id desc limit 1")[0][0]
+    assert run["audits"]["deal_left_window"] == 0
+    assert run["source_rows"]["prices_moved_out_of_window"] == 1
+
+    # Загрузка нового окна сделки ничего не меняет.
+    before = query("select price_id, loading_date from core.fact_price")
     load_window(settings, date(2026, 8, 1), date(2026, 9, 1))
-    assert query("select price_id from core.fact_price") == [(deal_id,)]
+    assert query("select price_id, loading_date from core.fact_price") == before
+
+
+def test_deal_deleted_from_reloaded_window_is_reported(source, query, settings):
+    deal_id = source.add_deal(loading_date=date(2026, 9, 15), dates=[date(2026, 9, 15)])
+    load_window(settings, date(2026, 9, 1), date(2026, 10, 1))
+    source.execute("delete from prices where id = %s", (deal_id,))
+
+    load_window(settings, date(2026, 9, 1), date(2026, 10, 1))
+
+    run = query("select details from ops.pipeline_runs order by run_id desc limit 1")[0][0]
+    assert run["audits"]["deal_left_window"] == 1
+    assert run["source_rows"]["prices_moved_out_of_window"] == 0
+    assert query("select count(*) from core.fact_price") == [(0,)]
 
 
 def test_reload_rewrites_only_changed_reference_rows(source, load, query):

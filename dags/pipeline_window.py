@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import urllib.error
+import urllib.request
+from collections.abc import Callable, Mapping
 from datetime import date, datetime, timedelta
 
 # Заявки заводятся заранее: на дату снимка в источнике лежат заявки с погрузкой до 110 дней вперёд.
@@ -40,3 +42,24 @@ def _window(start: date, end: date) -> str:
 
 def retrain_requested(conf: Mapping[str, object]) -> bool:
     return bool(conf.get("retrain"))
+
+
+# Профиль clickhouse необязателен: без него хоста clickhouse в сети compose нет.
+CLICKHOUSE_PING_TIMEOUT = 5
+
+
+def _ping(url: str) -> bool:
+    try:
+        with urllib.request.urlopen(url, timeout=CLICKHOUSE_PING_TIMEOUT) as response:
+            return response.read().strip() == b"Ok."
+    except (urllib.error.URLError, OSError):
+        return False
+
+
+def clickhouse_available(env: Mapping[str, str], ping: Callable[[str], bool] = _ping) -> bool:
+    """Обновлять ли зеркало: ClickHouse задан в окружении и отвечает на /ping."""
+    host = env.get("CLICKHOUSE_HOST")
+    port = env.get("CLICKHOUSE_PORT")
+    if not (host and port):
+        return False
+    return ping(f"http://{host}:{port}/ping")

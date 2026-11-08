@@ -124,6 +124,25 @@ def test_repeat_gives_same_predictions(trained, query, settings):
     assert query(PREDICTIONS_HASH) == before
 
 
+def test_reload_drops_predictions_of_deals_no_longer_scored(trained, deals, load, query):
+    future = query("select price_id from mart.ml_price_predictions where split = 'future' order by 1")
+    broken, bid, deleted = (row[0] for row in query(
+        "select price_id from mart.ml_price_predictions where split = 'test' order by 1 limit 3"
+    ))
+    deals.execute("update prices set price = 0 where id = %s", (broken,))
+    deals.execute("update prices set price_type = 6, is_fact = false where id = %s", (bid,))
+    deals.execute("delete from prices where id = %s", (deleted,))
+    before = query("select count(*) from mart.ml_price_predictions")[0][0]
+
+    load()
+
+    left = {row[0] for row in query("select price_id from mart.ml_price_predictions")}
+    assert not {broken, bid, deleted} & left
+    assert len(left) == before - 3
+    # Прогнозы сделок, которые модель по-прежнему оценивает, ждут ml.score и не удаляются.
+    assert {row[0] for row in future} <= left
+
+
 RELEASES = """
     select 'predictions', model_release from mart.ml_price_predictions
     union

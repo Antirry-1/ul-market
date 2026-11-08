@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from etl.config import Settings
-from etl.db import connect, read_sql
+from etl.db import connect, mirror_lock, read_sql
 from etl.log import log_event, setup_logging
 from etl.runs import tracked_run
 
@@ -120,7 +120,7 @@ def parse_tsv(text: str) -> list[tuple]:
 
 
 def mirror_route_card(settings: Settings, clickhouse: ClickHouse) -> None:
-    with tracked_run(settings.dwh_dsn, "clickhouse-mirror") as run:
+    with tracked_run(settings.dwh_dsn, "clickhouse-mirror") as run, mirror_lock(settings.dwh_dsn):
         ddl = read_sql("clickhouse/mart_route_card.sql")
         clickhouse.execute(f"drop table if exists {STAGING_TABLE}")
         clickhouse.execute(ddl.format(table=STAGING_TABLE))

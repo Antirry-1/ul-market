@@ -40,8 +40,8 @@ docker compose exec -T postgres psql -U postgres -d dwh -qAtX -v ON_ERROR_STOP=1
 | `core.bridge_price_body_group` | `335077\|e19c42eb2847248ab06cc94506b697a2` |
 | `dq.dq_quarantine_prices` | `203\|b0fda1dbc3152eb3e890827107b46f8a` |
 | `mart.mart_route_card` | `203644\|33a31b9e318fae32264d0f1b774fef90` |
-| `mart.ml_price_predictions` | `17969\|53364ef584b429e98ef34f3110ddee37` |
-| `mart.ml_model_metrics` | `93\|cb7c15e45b2810949662c2b8b9f3e750` |
+| `mart.ml_price_predictions` | `17969\|1cb9e555a51ee2e8ac90770c0508635d` |
+| `mart.ml_model_metrics` | `93\|2b728e297404fb09b969c819f9b60d0c` |
 | `mart.mart_market_summary` | `1032935\|9a06699da8fd3d58d2511fffa10fe505` |
 
 Если строк меньше 13, какой-то таблицы нет. Генератор и модель работают с фиксированным зерном, но на другом процессоре или другой сборке CatBoost хэши `ml_price_predictions` и `ml_model_metrics` могут отличаться. Тогда смотрите метрики из следующего шага, а остальные 11 хэшей должны совпасть в любом случае.
@@ -66,11 +66,11 @@ docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$DWH_DB"' < 
 
 | Модель | R² | MAPE, % | RMSE | MAE |
 |---|---:|---:|---:|---:|
-| `catboost_price_v1` | 0,9293 | 13,62 | 50 859 | 25 825 |
-| `ridge_v1` | 0,9271 | 13,59 | 51 642 | 26 176 |
+| `catboost_price_v1` | 0,9294 | 13,64 | 50 821 | 25 820 |
+| `ridge_v1` | 0,9271 | 13,59 | 51 647 | 26 177 |
 | `baseline_rate_per_km_v1` | 0,7172 | 42,78 | 101 726 | 62 112 |
-| `ablation_no_price_type` | 0,9260 | 14,11 | 52 024 | 26 684 |
-| `leak_demo_price_per_km` | 0,9821 | 6,92 | 25 608 | 12 775 |
+| `ablation_no_price_type` | 0,9260 | 14,11 | 52 043 | 26 679 |
+| `leak_demo_price_per_km` | 0,9870 | 5,71 | 21 847 | 10 407 |
 
 `leak_demo_price_per_km` специально обучена с утечкой, чтобы было видно, как она выглядит в метриках. Прогнозы она не пишет.
 
@@ -132,7 +132,7 @@ docker-compose --profile airflow up --build -d
 docker wait ul-market-airflow-trigger-1
 ```
 
-`airflow-trigger` запускает DAG на всём источнике с переобучением и завершается с его статусом, так что `0` здесь значит, что DAG прошёл. В интерфейсе на http://localhost:8081 (логин `admin`, пароль `local_airflow_admin_change_me`, это значение `_AIRFLOW_WWW_USER_PASSWORD` из `.env.example`) у запуска `full_*` все 9 задач зелёные. Хэши из шага 2 после этого не меняются.
+`airflow-trigger` запускает DAG на всём источнике с переобучением и завершается с его статусом, так что `0` здесь значит, что DAG прошёл. В интерфейсе на http://localhost:8081 (логин `admin`, пароль `local_airflow_admin_change_me`, это значение `_AIRFLOW_WWW_USER_PASSWORD` из `.env.example`) у запуска `full_*` 10 из 11 задач зелёные. Задача `clickhouse_mirror` пропущена: ClickHouse в этом шаге не запущен, и `clickhouse_gate` её отключает. Хэши из шага 2 после этого не меняются.
 
 ## 8. ClickHouse
 
@@ -143,7 +143,7 @@ docker compose --profile clickhouse exec clickhouse sh -c \
   'clickhouse-client --user "$CLICKHOUSE_USER" --password "$CLICKHOUSE_PASSWORD" -d "$CLICKHOUSE_DB" -q "select count() from mart_route_card final"'
 ```
 
-`clickhouse-mirror` перед публикацией сверяет суммы с PostgreSQL и при расхождении падает, поэтому `0` уже означает, что зеркало совпало. В таблице должно быть 203 644 строки. Примеры запросов дают те же числа, что и в PostgreSQL:
+`clickhouse-mirror` перед публикацией сверяет суммы с PostgreSQL и при расхождении падает, поэтому `0` уже означает, что зеркало совпало. Если вместе с этим профилем запущен и `airflow`, зеркало обновляет ещё и задача DAG `clickhouse_mirror`: в журнале `ops.pipeline_runs` тогда несколько записей `clickhouse-mirror`, и все в статусе `success`. В таблице должно быть 203 644 строки. Примеры запросов дают те же числа, что и в PostgreSQL:
 
 ```bash
 docker compose --profile clickhouse exec -T clickhouse sh -c \

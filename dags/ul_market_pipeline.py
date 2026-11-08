@@ -2,6 +2,7 @@
 
 Задачи вызывают те же команды, что и запуск без Airflow, поэтому результат не зависит от оркестратора.
 Обучение идёт только по запросу: ежедневный запуск применяет готовую модель.
+Зеркало витрины в ClickHouse обновляется после каждой сборки витрины, если ClickHouse запущен.
 
 Плановый запуск перегружает не один день, а окно от 35 дней до интервала до 120 дней после него:
 так в хранилище попадают заявки, созданные накануне с погрузкой в будущем, и поправленные недавние сделки.
@@ -12,13 +13,14 @@
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.operators.bash import BashOperator
-from airflow.operators.python import BranchPythonOperator
+from airflow.operators.python import BranchPythonOperator, ShortCircuitOperator
 from airflow.utils.trigger_rule import TriggerRule
-from pipeline_window import load_arguments, retrain_requested
+from pipeline_window import clickhouse_available, load_arguments, retrain_requested
 
 PYTHON = "/opt/pipeline-venv/bin/python"
 PIPELINE_DIR = "/opt/pipeline"
@@ -61,6 +63,13 @@ with DAG(
     )
     build_marts = pipeline_task("build_marts", "etl.cli build-marts")
 
+    # Без профиля clickhouse зеркало пропускается, и запуск DAG от этого не падает.
+    clickhouse_gate = ShortCircuitOperator(
+        task_id="clickhouse_gate",
+        python_callable=lambda: clickhouse_available(os.environ),
+    )
+    clickhouse_mirror = pipeline_task("clickhouse_mirror", "etl.clickhouse")
+
     train_gate = BranchPythonOperator(
         task_id="train_gate",
         python_callable=choose_after_retrain_gate("train", "score"),
@@ -76,6 +85,7 @@ with DAG(
     summary = pipeline_task("summary", "etl.cli summary", trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
 
     init_dwh >> load >> build_marts >> train_gate
+    build_marts >> clickhouse_gate >> clickhouse_mirror
     train_gate >> [train, score]
     train >> score
     score >> ablation_gate

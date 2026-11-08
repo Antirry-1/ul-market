@@ -19,7 +19,7 @@ NUMERIC_FEATURES = (
 )
 
 CATEGORICAL_FEATURES = (
-    "origin_region", "destination_region", "origin_city", "destination_city",
+    "origin_region", "destination_region", "origin_city_id", "destination_city_id",
     "primary_body_group", "body_type", "weight_category", "volume_category", "price_type",
 )
 
@@ -68,7 +68,9 @@ def prepare_features(frame: pd.DataFrame) -> pd.DataFrame:
     result["ln_distance"] = np.log(result["distance"])
     result["ln_distance_sq"] = result["ln_distance"] ** 2
     result["inverse_distance"] = 1000.0 / result["distance"]
-    # Код кузова и тип записи являются метками, а не величинами.
+    # Код города, код кузова и тип записи являются метками, а не величинами.
+    result["origin_city_id"] = result["loading_city_gcid"].astype("Int64").astype("string")
+    result["destination_city_id"] = result["unloading_city_gcid"].astype("Int64").astype("string")
     result["body_type"] = result["body_type"].astype("Int64").astype("string")
     result["price_type"] = result["price_type"].astype("Int64").astype("string")
     for column in CATEGORICAL_FEATURES:

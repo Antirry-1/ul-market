@@ -21,6 +21,12 @@ class BoostingParams:
     # Деревья учатся на остатках линейной модели: уровень цены им выучивать не нужно.
     level_offset: bool = False
 
+    def __post_init__(self) -> None:
+        # Уровень задан в логарифме цены. С меткой в рублях CatBoost прибавил бы логарифм к рублям
+        # и обучился бы без ошибки, но на бессмысленной сумме.
+        if self.level_offset and not self.log_target:
+            raise ValueError("level_offset работает только вместе с log_target")
+
     def as_dict(self) -> dict:
         return asdict(self)
 

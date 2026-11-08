@@ -151,10 +151,10 @@ select distinct on (num_code, setting_date)
 from raw.exchange_rates
 order by num_code, setting_date, id desc;
 
--- Название города для витрин и признаков модели, своё у каждого gc_id. Одноимённые города
--- из разных регионов иначе склеились бы в одно направление сводки и в одну категорию модели,
--- а аудит сводки остановил бы сборку витрины. Регион дописывается только к повторяющемуся
--- названию, gc_id только если совпал и регион. Неповторяющееся название остаётся как есть.
+-- Название города для витрин, своё у каждого gc_id. Одноимённые города из разных регионов
+-- иначе склеились бы в одно направление сводки, и аудит сводки остановил бы сборку витрины.
+-- Регион дописывается только к повторяющемуся названию, gc_id только если совпал и регион.
+-- Неповторяющееся название остаётся как есть.
 create or replace view core.v_city_label as
 select
     gc_id,
@@ -168,7 +168,11 @@ from core.dim_city;
 
 -- Единственная точка доступа модели к данным. price_rub здесь только как целевая переменная,
 -- outlier_mark только для отбора строк: список признаков задан в ml/features.py.
-create or replace view core.v_ml_features as
+-- Город модель получает по gc_id, а не по подписи из v_city_label: подпись меняется, когда
+-- в справочнике появляется одноимённый город, и модель увидела бы знакомый город как новый.
+-- drop, а не только create or replace: тот не умеет убирать колонки. От представления ничего не зависит.
+drop view if exists core.v_ml_features;
+create view core.v_ml_features as
 select
     f.price_id,
     f.loading_date,
@@ -181,8 +185,6 @@ select
     f.total_volume,
     o.region    as origin_region,
     d.region    as destination_region,
-    ol.city_label as origin_city,
-    dl.city_label as destination_city,
     o.latitude  as origin_lat,
     o.longitude as origin_lon,
     d.latitude  as destination_lat,
@@ -195,8 +197,6 @@ select
 from core.fact_price f
 join core.dim_city o on o.gc_id = f.loading_city_gcid
 join core.dim_city d on d.gc_id = f.unloading_city_gcid
-join core.v_city_label ol on ol.gc_id = f.loading_city_gcid
-join core.v_city_label dl on dl.gc_id = f.unloading_city_gcid
 where f.is_fact
   and f.price_type in (1, 2, 3, 4, 5, 9)
   and not f.complex
