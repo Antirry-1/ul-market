@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 from dataclasses import replace
 from datetime import date, datetime
 
@@ -42,8 +43,8 @@ SOURCE_TABLES = "price_dates, price_body_types, prices, exchange_rates, cities, 
 DWH_TABLES = (
     "raw.prices, raw.price_dates, raw.price_body_types, raw.cities, raw.body_types, raw.exchange_rates, "
     "core.fact_price_date, core.bridge_price_body_group, core.fact_price, core.dim_city, core.dim_body_type, "
-    "dq.dq_quarantine_prices, mart.mart_route_card, mart.ml_price_predictions, mart.ml_model_metrics, "
-    "ops.pipeline_runs"
+    "dq.dq_quarantine_prices, mart.mart_route_card, mart.mart_market_summary, mart.ml_price_predictions, "
+    "mart.ml_model_metrics, ops.pipeline_runs"
 )
 
 
@@ -127,7 +128,7 @@ class SourceData:
 
 
 @pytest.fixture(scope="session")
-def settings(tmp_path_factory: pytest.TempPathFactory) -> Settings:
+def settings(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Settings]:
     try:
         base = Settings.from_env()
         conninfo = conninfo_to_dict(base.dwh_dsn)
@@ -145,13 +146,17 @@ def settings(tmp_path_factory: pytest.TempPathFactory) -> Settings:
     with psycopg.connect(source_dsn) as conn:
         conn.execute((SQL_DIR / "schema.sql").read_text(encoding="utf-8"))
     init_dwh(dwh_dsn)
-    return replace(
+    yield replace(
         base,
         source_dsn=source_dsn,
         dwh_dsn=dwh_dsn,
         as_of=date(2026, 10, 26),
         model_dir=tmp_path_factory.mktemp("models"),
     )
+    # Тесты идут и на рабочем PostgreSQL стенда: без удаления там оставались бы две лишние базы.
+    with psycopg.connect(base.dwh_dsn, autocommit=True) as admin:
+        for name in (TEST_SOURCE_DB, TEST_DWH_DB):
+            admin.execute(f"drop database if exists {name} with (force)")
 
 
 @pytest.fixture(autouse=True)
